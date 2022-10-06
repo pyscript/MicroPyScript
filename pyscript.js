@@ -123,7 +123,7 @@ class PyScriptTag extends Plugin {
                 document.dispatchEvent(pyScriptRegistered);
             }
         }
-        // Register it (thUs extracting the code from the page).
+        // Register it (thus extracting the code from the page).
         customElements.define('py-script', PyScript);
     }
 }
@@ -173,11 +173,27 @@ class MicroPythonRuntime extends Runtime {
     }
 }
 
+
+class CPythonRuntime extends Runtime {
+    /*
+    The standard CPython version of Python compiled to WASM. For more
+    information, see:
+
+    https://github.com/python/cpython/blob/main/Tools/wasm/README.md
+
+    TODO: Finish this.
+    */
+
+    static get url() {
+        return "pybuild/python.js";
+    }
+}
+
 /******************************************************************************
 The core PyScript app definition.
 ******************************************************************************/
 
-function main() {
+const main = function() {
     // Really simple logging. Emoji 🐍 highlights PyScript app logs. ;-)
     const logger = function() {
         return Function.prototype.bind.call(console.log, console, "🐍 ", ...arguments);
@@ -197,10 +213,10 @@ function main() {
     const pendingScripts = [];
     // Details of runtimes.
     // Key: lowercase runtime name.
-    // Value: path to load runtime.
+    // Value: the class wrapping that version of the runtime.
     const runtimes = {
         "micropython": MicroPythonRuntime,
-        "cpython": "pybuild/python.js"
+        "cpython": CPythonRuntime
     }
     // Default to smallest/fastest runtime.
     runtimes["default"] = runtimes["micropython"]
@@ -356,7 +372,6 @@ function main() {
             evaluate each script in turn with the runtime.
             */
             logger("Evaluating code. 🤖\n" + script.code);
-            debugger;
             runtime.eval(script.code);
         },
     }
@@ -366,14 +381,8 @@ function main() {
     // steps.
     //
     // These functions are defined in the order they're roughly expected to
-    // be called through the life-cycle of the page.
-
-    app["run"] = function() {
-        /*
-        Start everthing running.
-        */
-        app.loadConfig();
-    }
+    // be called through the life-cycle of the page, although this cannot be
+    // guaranteed for some of the functions.
 
     function onPyConfigured(e) {
         /*
@@ -432,11 +441,19 @@ function main() {
     }
     document.addEventListener("py-eval-script", onEvalScript);
 
-    return app;
-}
+    // Finally, return a function to start PyScript.
+
+    return function() {
+        /*
+        Start PyScript.
+        */
+        // TODO: check test/debug flag.
+        app.loadConfig();
+        return app;
+    }
+}();
 
 /******************************************************************************
 Start PyScript.
 ******************************************************************************/
-const _pyscriptApp = main();
-_pyscriptApp.run();
+main();

@@ -1,15 +1,16 @@
 SHELL := /bin/bash
 
 all:
-	@echo "\nThere's no default Makefil target right now. Try\n\n"
+	@echo "There's no default Makefile target right now. Try:"
+	@echo ""
 	@echo "make setup - clone the required repositories."
 	@echo "make update - update the emsdk compiler."
-	@echo "make refresh - re-compile MicroPython for WASM into build."
+	@echo "make mp - compile MicroPython for WASM into the mpbuild directory."
+	@echo "make serve - serve the project at: http://0.0.0.0:8000/"
 
 setup:
 	git clone https://github.com/emscripten-core/emsdk.git
 	git clone https://github.com/micropython/micropython.git
-	git clone  https://github.com/python/cpython.git
 
 update:
 	cd emsdk && git pull && ./emsdk install latest && ./emsdk activate latest
@@ -19,12 +20,6 @@ mp:
 	$(MAKE) -C micropython/mpy-cross
 	./emsdk/emsdk activate latest && source emsdk/emsdk_env.sh && $(MAKE) -C micropython/ports/webassembly
 	cp -r micropython/ports/webassembly/build mpbuild
-
-py:
-	rm -rf pybuild
-	./cpython/Tools/wasm/wasm_build.py build
-	./emsdk/emsdk activate latest && source emsdk/emsdk_env.sh && ./cpython/Tools/wasm/wasm_build.py emscripten-browser
-	cp -r cpython/builddir/emscripten-browser pybuild
 
 serve:
 	python -m http.server

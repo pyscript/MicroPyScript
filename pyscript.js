@@ -1,7 +1,33 @@
 "use strict";
+/******************************************************************************
+MicroPyscript.
+
+A small, simple, single file kernel of PyScript, made for testing purposes.
+
+See the README for more details, design decisions, and an explanation of how
+things work.
+
+Authors:
+- Nicholas H.Tollervey (ntollervey@anaconda.org)
+
+Copyright (c) 2022 Anaconda Inc. 
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+******************************************************************************/
+
 
 /******************************************************************************
-Base classes.
+Base classes and constants.
 ******************************************************************************/
 class Plugin {
     /*
@@ -94,32 +120,34 @@ class Runtime {
     }
 }
 
+
+const splashInnerHTML = '<svg class="whole" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" height="48" width="48"><g id="loader"><animateTransform xlink:href="#loader" attributeName="transform" attributeType="XML" type="rotate" from="0 50 50" to="360 50 50" dur="1s" begin="0s" repeatCount="indefinite" restart="always"></animateTransform><path class="a" opacity="0.2" fill-rule="evenodd" clip-rule="evenodd" d="M50 100C77.6142 100 100 77.6142 100 50C100 22.3858 77.6142 0 50 0C22.3858 0 0 22.3858 0 50C0 77.6142 22.3858 100 50 100ZM50 90C72.0914 90 90 72.0914 90 50C90 27.9086 72.0914 10 50 10C27.9086 10 10 27.9086 10 50C10 72.0914 27.9086 90 50 90Z" fill="#999999"></path><path class="b" fill-rule="evenodd" clip-rule="evenodd" d="M100 50C100 22.3858 77.6142 0 50 0V10C72.0914 10 90 27.9086 90 50H100Z" fill="#999999"></path></g></svg>';
+
+
 /******************************************************************************
 Built-in plugins and runtimes.
 ******************************************************************************/
-
 class PyScriptTag extends Plugin {
     start(config) {
         // Define the PyScript element.
         class PyScript extends HTMLElement {
             connectedCallback() {
                 /*
-                All code is dispatched as a "py-code" event with code for later
-                processing.
+                All code is dispatched as a py-script-registered event
+                for later processing.
 
                 Additional metadata if available:
-                    - this element's id
-                    - the src value
+                    - the src value for remote source file
+                    - this element as target
                 */
-                var code = this.textContent;
+                const code = this.textContent;
                 this.textContent = "";
-                var detail = {}
-                detail.code = code.trim() ? code : "";
-                if (this.attributes.src) {
-                    detail.src = this.attributes.src.value;
-                }
-                detail.target = this;
-                const pyScriptRegistered = new CustomEvent("py-script-registered", {"detail": detail});
+                const script = {
+                    code: code.trim() ? code : "",
+                    src: this.attributes.src ? this.attributes.src.value : "",
+                    target: this
+                };
+                const pyScriptRegistered = new CustomEvent("py-script-registered", {"detail": script});
                 document.dispatchEvent(pyScriptRegistered);
             }
         }
@@ -146,6 +174,7 @@ class MicroPythonRuntime extends Runtime {
         if(config.mp_memory) {
             mp_memory = config.mp_memory;
         }
+        // TODO: Fix this.
         mp_js_stdout.addEventListener('print', function(e) {
             this.innerText = this.innerText + e.data;
         }, false);
@@ -189,28 +218,33 @@ class CPythonRuntime extends Runtime {
     }
 }
 
+
 /******************************************************************************
 The core PyScript app definition.
 ******************************************************************************/
-
 const main = function() {
     // Really simple logging. Emoji 🐍 highlights PyScript app logs. ;-)
     const logger = function() {
         return Function.prototype.bind.call(console.log, console, "🐍 ", ...arguments);
     }();
     logger("Starting PyScript. 👋")
+
     // Default configuration settings for PyScript. These may be overridden by
     // the app.loadConfig function.
     const config = {
         "runtime": "micropython"  // Numpty default.
     }
+
     // Contains plugins to the PyScript context.
     const plugins = [];
+
     // Contains Python scripts found on the page.
     const scripts = [];
+
     // Contains Python scripts whose source code is available, and pending 
     // evaluation by the runtime.
     const pendingScripts = [];
+
     // Details of runtimes.
     // Key: lowercase runtime name.
     // Value: the class wrapping that version of the runtime.
@@ -220,9 +254,11 @@ const main = function() {
     }
     // Default to smallest/fastest runtime.
     runtimes["default"] = runtimes["micropython"]
+
     // Eventually references an instance of the Runtime class, representing the
     // started runtime.
     let runtime = null;
+
     // Flag to indicate the runtime is ready to evaluate scripts.
     let runtimeReady = false;
 
@@ -298,15 +334,15 @@ const main = function() {
         },
         runtimeStarted: function() {
             /*
-            The runtime is ready to go, so flip the runtimeReady flag and begin
+            The runtime is ready to go, so flip the runtimeReady flag, step
+            through each registered plugin's onRuntimeReady method, and begin
             evaluating any code in the pendingScripts queue.
             */
             logger(`Runtime started. 🎬`)
             runtimeReady = true;
             plugins.forEach(function(plugin) {
-                plugin.onRuntimeReady(config);
+                plugin.onRuntimeReady(config, runtime);
             });
-            pendingScripts.reverse();
             pendingScripts.forEach(function(script) {
                 const pyEvalScript = new CustomEvent("py-eval-script", {detail: script});
                 document.dispatchEvent(pyEvalScript);
@@ -316,8 +352,8 @@ const main = function() {
         },
         registerScript(script) {
             /*
-            Add a Python script to the scripts array, to be run when the
-            runtime is ready.
+            Add a Python script to the scripts array. If required load the code
+            by fetching it from the URL found in the script's src attribute.
             */
             // Ignore code that is just whitespace.
             script.code = script.code.trim() ? script.code : "";
@@ -331,7 +367,7 @@ const main = function() {
                 // Handle asynchronous loading of the script's code from the
                 // URL in src.
                 fetch(script.src).then(function(response) {
-                    logger(`Fetch script from "${script.src}" 📡`, response);
+                    logger(`Fetched script from "${script.src}" 📡`, response);
                     if (response.ok) {
                         response.text().then((data) => {
                             script.code = data;
@@ -347,14 +383,14 @@ const main = function() {
             } else {
                 // Warn that a script has no source code either inline or via
                 // the src attribute.
-                logger("Script has no source code. ⁉️", script);
+                logger("Script has no source code. ⁉️😕", script);
             }
         },
         loadScript(script) {
             /*
-            Ensure the source code for all the scripts is available. For any
-            code that has a src but no content, will fetch the code from the
-            URL in src. Dispatches a py-scripts-loaded event when done.
+            The given script is either queued for later evaluation if the
+            runtime isn't ready yet, or the py-eval-script event is
+            dispatched so the runtime can evaluate it.
             */
             if (runtimeReady) {
                 // Runtime is ready, so evaluate the code.
@@ -376,19 +412,22 @@ const main = function() {
         },
     }
 
-    // The following functions are used to coordinate the unfolding of PyScript
-    // as various events are dispatched and state evolves to trigger the next
-    // steps.
+
+    // The following functions coordinate the unfolding of PyScript as various
+    // events are dispatched and state evolves to trigger the next steps.
     //
     // These functions are defined in the order they're roughly expected to
     // be called through the life-cycle of the page, although this cannot be
     // guaranteed for some of the functions.
-
     function onPyConfigured(e) {
         /*
-        Once configured, load the runtime, register the default plugins
-        (currently only the PyScriptTag), freeze the config and start the
-        plugins to kick off extracting Python scripts from the page.
+        Once PyScript has loaded its configuration:
+            - register the default plugins (currently only PyScriptTag), so
+              they can modify the config if required.
+            - freeze the config so it can't be changed from this point.
+            - load the Python runtime into the browser.
+            - start the plugins to kick off extracting Python scripts from the
+              page.
         */
         app.registerPlugin(new PyScriptTag());
         Object.freeze(config);
@@ -398,31 +437,41 @@ const main = function() {
     }
     document.addEventListener("py-configured", onPyConfigured);
 
+
     function onPyScriptRegistered(e) {
         /*
-        Register a Python script and related metadatacontained in the
-        dispatched event's detail.
+        A plugin has, in some way, detected a Python script definition.
+
+        Register metadata about the script via the dispatched event's detail.
         */
         app.registerScript(e.detail);
     }
     document.addEventListener("py-script-registered", onPyScriptRegistered);
 
+
     function onPyScriptLoaded(e) {
         /*
-        The source of a Python script is available as metadata in the
-        dispatched event's detail.
+        The source of a Python script has been obtained either as inline code
+        or as the content of a remote Python source file that has been fetched
+        over the network.
+
+        The source code is included as metadata in the dispatched event's
+        detail. So signal to the app the script is fully loaded.
         */
         app.loadScript(e.detail);
     }
     document.addEventListener("py-script-loaded", onPyScriptLoaded);
 
+
     function onRuntimeLoaded(e) {
         /*
-        The runtime has loaded. 
+        The runtime has loaded over the network. Next, start the runtime in
+        this PyScript context.
         */
         app.startRuntime();
     }
     document.addEventListener("py-runtime-loaded", onRuntimeLoaded);
+
 
     function onRuntimeReady(e) {
         /*
@@ -432,26 +481,27 @@ const main = function() {
     }
     document.addEventListener("py-runtime-ready", onRuntimeReady);
 
+
     function onEvalScript(e) {
         /*
-        The runtime is ready, and a script's source code is ready, so evaluate
-        the script with the runtime!
+        Handle the event designating a script is ready to be evaluated by the
+        runtime.
         */
         app.evaluateScript(e.detail)
     }
     document.addEventListener("py-eval-script", onEvalScript);
 
-    // Finally, return a function to start PyScript.
 
+    // Finally, return a function to start PyScript.
     return function() {
-        /*
-        Start PyScript.
-        */
-        // TODO: check test/debug flag.
-        app.loadConfig();
+        // Check to bypass loadConfig, for testing purposes.
+        if (!window.pyscriptTest) {
+            app.loadConfig();
+        }
         return app;
     }
 }();
+
 
 /******************************************************************************
 Start PyScript.

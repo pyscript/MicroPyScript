@@ -1,15 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <script src="mpbuild/micropython.js"></script>
-  </head>
   <body>
-    <py-script>
-def hello(name="World"):
-  return "Hello, " + name
-
-print(hello())
-    </py-script>
+    <py-config>
+    {
+      "runtime": "micropython"
+    }
+    </py-config>
+    <py-script src="hello.py"></py-script>
     <pre><code id="mp_js_stdout"></code></pre>
   </body>
   <script src="pyscript.js" type="module"></script>

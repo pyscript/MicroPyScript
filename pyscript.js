@@ -88,7 +88,8 @@ class Runtime {
 
     static ready() {
         /*
-        Dispatch the py-runtime-ready event (when the runtime has started).
+        Dispatch the py-runtime-ready event (for when the runtime has
+        eventually started and is ready to evaluate code).
         */
         const pyRuntimeReady = new CustomEvent("py-runtime-ready");
         document.dispatchEvent(pyRuntimeReady);
@@ -97,13 +98,14 @@ class Runtime {
     start(config) {
         /*
         Instantiate, setup, configure and do whatever else is needed to start
-        the runtime.
+        the runtime. This is called once the runtime is loaded into the
+        browser.
         */
     }
 
     eval(script) {
         /*
-        Use the runtime to evaluate a script.
+        Use the runtime to evaluate the script.code.
         */
     }
 
@@ -121,7 +123,9 @@ class Runtime {
 }
 
 
-const splashInnerHTML = '<svg class="whole" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" height="48" width="48"><g id="loader"><animateTransform xlink:href="#loader" attributeName="transform" attributeType="XML" type="rotate" from="0 50 50" to="360 50 50" dur="1s" begin="0s" repeatCount="indefinite" restart="always"></animateTransform><path class="a" opacity="0.2" fill-rule="evenodd" clip-rule="evenodd" d="M50 100C77.6142 100 100 77.6142 100 50C100 22.3858 77.6142 0 50 0C22.3858 0 0 22.3858 0 50C0 77.6142 22.3858 100 50 100ZM50 90C72.0914 90 90 72.0914 90 50C90 27.9086 72.0914 10 50 10C27.9086 10 10 27.9086 10 50C10 72.0914 27.9086 90 50 90Z" fill="#999999"></path><path class="b" fill-rule="evenodd" clip-rule="evenodd" d="M100 50C100 22.3858 77.6142 0 50 0V10C72.0914 10 90 27.9086 90 50H100Z" fill="#999999"></path></g></svg>';
+// The innerHTML of the default splash screen to show while PyScript is
+// starting up. Currently a simple SVG animation above the word "PyScript".
+const defaultSplash= '<div style="position:fixed;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:99999;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);-ms-transform:translate(-50%,-50%);color:white;font-family:monospace;font-size:10px;">Loading PyScript...</div></div>';
 
 
 /******************************************************************************
@@ -170,7 +174,7 @@ class MicroPythonRuntime extends Runtime {
     }
 
     start(config) {
-        let mp_memory = 64 * 1024;  // 64K
+        let mp_memory = 1024 * 1024;  // 1Mb
         if(config.mp_memory) {
             mp_memory = config.mp_memory;
         }
@@ -186,8 +190,8 @@ class MicroPythonRuntime extends Runtime {
         }
     }
 
-    eval(code) {
-        mp_js_do_str(code);
+    eval(script) {
+        mp_js_do_str(script.code);
     }
 
     startREPL() {
@@ -219,6 +223,47 @@ class CPythonRuntime extends Runtime {
 }
 
 
+class PyodideRuntime extends Runtime {
+    /*
+    Pyodide if a Python distribution for the browser, compiled to WASM. For
+    more information, see:
+
+    https://pyodide.org/en/stable/
+
+    TODO: Finish this. It's a hack!
+    */
+
+    static get url() {
+        return "https://cdn.jsdelivr.net/pyodide/v0.21.3/full/pyodide.js";
+    }
+
+    start(config) {
+        const stdout_func = function(output) {
+            if (output === "Python initialization complete") {
+                return;
+            }
+            mp_js_stdout.innerText += output + "\n";
+        };
+        async function main() {
+            let pyodide = await loadPyodide({
+                stdout: stdout_func
+            });
+            return pyodide;
+        }
+        let pyodideReadyPromise = main();
+        const myself = this;
+        pyodideReadyPromise.then(result => {
+            myself.pyodide = result;
+            Runtime.ready()
+        });
+    }
+
+    eval(script) {
+        this.pyodide.runPython(script.code);
+    }
+}
+
+
 /******************************************************************************
 The core PyScript app definition.
 ******************************************************************************/
@@ -232,7 +277,8 @@ const main = function() {
     // Default configuration settings for PyScript. These may be overridden by
     // the app.loadConfig function.
     const config = {
-        "runtime": "micropython"  // Numpty default.
+        "runtime": "micropython",  // Numpty default.
+        "splash": defaultSplash  // grey spinner in overlay.
     }
 
     // Contains plugins to the PyScript context.
@@ -250,7 +296,8 @@ const main = function() {
     // Value: the class wrapping that version of the runtime.
     const runtimes = {
         "micropython": MicroPythonRuntime,
-        "cpython": CPythonRuntime
+        "cpython": CPythonRuntime,
+        "pyodide": PyodideRuntime
     }
     // Default to smallest/fastest runtime.
     runtimes["default"] = runtimes["micropython"]
@@ -261,6 +308,10 @@ const main = function() {
 
     // Flag to indicate the runtime is ready to evaluate scripts.
     let runtimeReady = false;
+
+    // To hold a reference to the div containing the start-up splash animation
+    // displayed while PyScript starts up.
+    let splashElement = null;
 
     // The app object contains "public" functions to change the state of
     // private variables within this function/closure.
@@ -283,6 +334,22 @@ const main = function() {
             logger("Loaded configuration. ✅", config);
             const pyConfigured = new CustomEvent("py-configured", {detail: config});
             document.dispatchEvent(pyConfigured);
+        },
+        splashOn: function() {
+            /*
+            Display the splash screen for when PyScript is starting.
+            */
+            splashElement = document.createElement("div");
+            splashElement.innerHTML = config.splash;
+            const body = document.getElementsByTagName('body')[0];
+            body.appendChild(splashElement);
+
+        },
+        splashOff: function() {
+            /*
+            Remove the splash screen, once PyScript is finished starting.
+            */
+            splashElement.parentNode.removeChild(splashElement);
         },
         registerPlugin: function(plugin) {
             /*
@@ -386,11 +453,13 @@ const main = function() {
                 logger("Script has no source code. ⁉️😕", script);
             }
         },
-        loadScript(script) {
+        scriptLoaded(script) {
             /*
-            The given script is either queued for later evaluation if the
-            runtime isn't ready yet, or the py-eval-script event is
-            dispatched so the runtime can evaluate it.
+            The given script is ready to be evaluated.
+
+            Either queue it for later evaluation if the runtime isn't ready
+            yet, or dispatch the py-eval-script event to signal to the runtime
+            it should evaluate the script.
             */
             if (runtimeReady) {
                 // Runtime is ready, so evaluate the code.
@@ -408,7 +477,7 @@ const main = function() {
             evaluate each script in turn with the runtime.
             */
             logger("Evaluating code. 🤖\n" + script.code);
-            runtime.eval(script.code);
+            runtime.eval(script);
         },
     }
 
@@ -419,6 +488,7 @@ const main = function() {
     // These functions are defined in the order they're roughly expected to
     // be called through the life-cycle of the page, although this cannot be
     // guaranteed for some of the functions.
+
     function onPyConfigured(e) {
         /*
         Once PyScript has loaded its configuration:
@@ -433,10 +503,9 @@ const main = function() {
         Object.freeze(config);
         logger("Frozen config. ❄️", config);
         app.loadRuntime();
+        app.splashOn();
         app.startPlugins();
     }
-    document.addEventListener("py-configured", onPyConfigured);
-
 
     function onPyScriptRegistered(e) {
         /*
@@ -446,8 +515,6 @@ const main = function() {
         */
         app.registerScript(e.detail);
     }
-    document.addEventListener("py-script-registered", onPyScriptRegistered);
-
 
     function onPyScriptLoaded(e) {
         /*
@@ -458,10 +525,8 @@ const main = function() {
         The source code is included as metadata in the dispatched event's
         detail. So signal to the app the script is fully loaded.
         */
-        app.loadScript(e.detail);
+        app.scriptLoaded(e.detail);
     }
-    document.addEventListener("py-script-loaded", onPyScriptLoaded);
-
 
     function onRuntimeLoaded(e) {
         /*
@@ -470,17 +535,14 @@ const main = function() {
         */
         app.startRuntime();
     }
-    document.addEventListener("py-runtime-loaded", onRuntimeLoaded);
-
 
     function onRuntimeReady(e) {
         /*
         The runtime is ready to evaluate scripts.
         */
+        app.splashOff();
         app.runtimeStarted();
     }
-    document.addEventListener("py-runtime-ready", onRuntimeReady);
-
 
     function onEvalScript(e) {
         /*
@@ -489,7 +551,17 @@ const main = function() {
         */
         app.evaluateScript(e.detail)
     }
-    document.addEventListener("py-eval-script", onEvalScript);
+
+    
+    // Only create event listeners when NOT in test circumstances.
+    if (!window.pyscriptTest) {
+        document.addEventListener("py-configured", onPyConfigured);
+        document.addEventListener("py-script-registered", onPyScriptRegistered);
+        document.addEventListener("py-script-loaded", onPyScriptLoaded);
+        document.addEventListener("py-runtime-loaded", onRuntimeLoaded);
+        document.addEventListener("py-runtime-ready", onRuntimeReady);
+        document.addEventListener("py-eval-script", onEvalScript);
+    }
 
 
     // Finally, return a function to start PyScript.
@@ -506,4 +578,4 @@ const main = function() {
 /******************************************************************************
 Start PyScript.
 ******************************************************************************/
-main();
+window.pyscriptApp = main();

@@ -7,6 +7,7 @@ all:
 	@echo "make update - update the emsdk compiler."
 	@echo "make mp - compile MicroPython for WASM into the mpbuild directory."
 	@echo "make serve - serve the project at: http://0.0.0.0:8000/"
+	@echo "make test - while serving the app, run the test suite in browser."
 
 setup:
 	git clone https://github.com/emscripten-core/emsdk.git
@@ -17,9 +18,13 @@ update:
 
 mp:
 	rm -rf mpbuild
+	rm -rf micropython/ports/webassembly/build
 	$(MAKE) -C micropython/mpy-cross
 	./emsdk/emsdk activate latest && source emsdk/emsdk_env.sh && $(MAKE) -C micropython/ports/webassembly
 	cp -r micropython/ports/webassembly/build mpbuild
 
 serve:
 	python -m http.server
+
+test:
+	python -m webbrowser "http://0.0.0.0:8000/SpecRunner.html"

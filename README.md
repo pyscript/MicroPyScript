@@ -205,7 +205,7 @@ That's it. You can see this unfolding in the image below, taken from the
 console logs for the example `hello.py` based application found in
 `index.html`.
 
-![PyScript logs](pyscript-logs.png?raw=true "PyScript logs")
+![PyScript logs](https://raw.githubusercontent.com/ntoll/micropyscript/main/pyscript-log.png "PyScript logs")
 
 ## The future
 

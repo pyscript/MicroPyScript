@@ -268,11 +268,13 @@ class PyodideRuntime extends Runtime {
 The core PyScript app definition.
 ******************************************************************************/
 const main = function() {
+    // Used to measure start-up times.
+    const start = new Date();
     // Really simple logging. Emoji 🐍 highlights PyScript app logs. ;-)
     const logger = function() {
         return Function.prototype.bind.call(console.log, console, "🐍 ", ...arguments);
     }();
-    logger("Starting PyScript. 👋")
+    logger("Starting PyScript. 👋", start);
 
     // Default configuration settings for PyScript. These may be overridden by
     // the app.loadConfig function.
@@ -309,7 +311,7 @@ const main = function() {
     // Flag to indicate the runtime is ready to evaluate scripts.
     let runtimeReady = false;
 
-    // To hold a reference to the div containing the start-up splash animation
+    // To hold a reference to the div containing the start-up splash screen
     // displayed while PyScript starts up.
     let splashElement = null;
 
@@ -343,7 +345,6 @@ const main = function() {
             splashElement.innerHTML = config.splash;
             const body = document.getElementsByTagName('body')[0];
             body.appendChild(splashElement);
-
         },
         splashOff: function() {
             /*
@@ -383,7 +384,8 @@ const main = function() {
             const runtimeElement = document.createElement("script");
             runtimeElement.src = runtimes[runtimeName.toLowerCase()].url;
             runtimeElement.onload = function(e) {
-                logger(`Runtime "${runtimeName}" loaded. 👍`)
+                let duration = new Date() - start;
+                logger(`Runtime "${runtimeName}" loaded (${duration}ms). 👍`);
                 const pyRuntimeLoaded = new CustomEvent("py-runtime-loaded", {detail: runtimeName});
                 document.dispatchEvent(pyRuntimeLoaded);
             };
@@ -405,7 +407,8 @@ const main = function() {
             through each registered plugin's onRuntimeReady method, and begin
             evaluating any code in the pendingScripts queue.
             */
-            logger(`Runtime started. 🎬`)
+            let duration = new Date() - start;
+            logger(`Runtime started (${duration}ms). 🎬`);
             runtimeReady = true;
             plugins.forEach(function(plugin) {
                 plugin.onRuntimeReady(config, runtime);

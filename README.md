@@ -14,7 +14,7 @@ This is the way:
 * Build for change.
 
 This is a solid foundation for lightweight testing of Python runtimes that
-target WASM. Inspired by code in the "real" PyTest website and our plans for
+target WASM. Inspired by code in the "real" PyScript website and our plans for
 plugins and simple event based coordination.
 
 Complexity, edge cases and customization is (hopefully) confined to plugins and

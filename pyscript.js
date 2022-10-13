@@ -29,7 +29,7 @@ limitations under the License.
 /******************************************************************************
 Base classes and constants.
 ******************************************************************************/
-class Plugin {
+class PyScriptPlugin {
     /*
     Defines a "plugin" in PyScript.
     */
@@ -91,7 +91,7 @@ class Runtime {
         Dispatch the py-runtime-ready event (for when the runtime has
         eventually started and is ready to evaluate code).
         */
-        const pyRuntimeReady = new CustomEvent("py-runtime-ready");
+        const pyRuntimeReady = new CustomEvent("py-runtime-ready", this);
         document.dispatchEvent(pyRuntimeReady);
     }
 
@@ -124,14 +124,15 @@ class Runtime {
 
 
 // The innerHTML of the default splash screen to show while PyScript is
-// starting up. Currently a simple SVG animation above the word "PyScript".
+// starting up. Currently the page is greyed out and the words
+// "Loading PyScript...".
 const defaultSplash= '<div style="position:fixed;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:99999;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);-ms-transform:translate(-50%,-50%);color:white;font-family:monospace;font-size:10px;">Loading PyScript...</div></div>';
 
 
 /******************************************************************************
 Built-in plugins and runtimes.
 ******************************************************************************/
-class PyScriptTag extends Plugin {
+class PyScriptTag extends PyScriptPlugin {
     start(config) {
         // Define the PyScript element.
         class PyScript extends HTMLElement {
@@ -268,13 +269,11 @@ class PyodideRuntime extends Runtime {
 The core PyScript app definition.
 ******************************************************************************/
 const main = function() {
-    // Used to measure start-up times.
-    const start = new Date();
     // Really simple logging. Emoji 🐍 highlights PyScript app logs. ;-)
     const logger = function() {
         return Function.prototype.bind.call(console.log, console, "🐍 ", ...arguments);
     }();
-    logger("Starting PyScript. 👋", start);
+    logger("Starting PyScript. 👋");
 
     // Default configuration settings for PyScript. These may be overridden by
     // the app.loadConfig function.
@@ -301,8 +300,6 @@ const main = function() {
         "cpython": CPythonRuntime,
         "pyodide": PyodideRuntime
     }
-    // Default to smallest/fastest runtime.
-    runtimes["default"] = runtimes["micropython"]
 
     // Eventually references an instance of the Runtime class, representing the
     // started runtime.
@@ -377,28 +374,25 @@ const main = function() {
 
             TL;DR - a new script tag with the correct src is added to the head.
             */
-            const runtimeName = config.runtime ? config.runtime : "default";
-            if(!runtimes.hasOwnProperty(runtimeName)) {
-                throw `💥 Unknown runtime: "${runtimeName}" (known runtimes: ${Object.keys(runtimes)})`;
+            if(!runtimes.hasOwnProperty(config.runtime)) {
+                throw `💥 Unknown runtime: "${config.runtime}" (known runtimes: ${Object.keys(runtimes)})`;
             }
             const runtimeElement = document.createElement("script");
-            runtimeElement.src = runtimes[runtimeName.toLowerCase()].url;
+            runtimeElement.src = runtimes[config.runtime.toLowerCase()].url;
             runtimeElement.onload = function(e) {
-                let duration = new Date() - start;
-                logger(`Runtime "${runtimeName}" loaded (${duration}ms). 👍`);
-                const pyRuntimeLoaded = new CustomEvent("py-runtime-loaded", {detail: runtimeName});
+                logger(`Runtime "${config.runtime}" loaded. 👍`);
+                const pyRuntimeLoaded = new CustomEvent("py-runtime-loaded", {detail: config.runtime});
                 document.dispatchEvent(pyRuntimeLoaded);
             };
             var head = document.getElementsByTagName('head')[0];
-            logger(`Loading runtime "${runtimeName}". 🚀`)
+            logger(`Loading runtime "${config.runtime}". 🚀`)
             head.appendChild(runtimeElement);
         },
         startRuntime: function() {
             /*
             Congigure and start the Python runtime.
             */
-            const runtimeName = config.runtime ? config.runtime : "default";
-            runtime = new runtimes[runtimeName.toLowerCase()]();
+            runtime = new runtimes[config.runtime.toLowerCase()]();
             runtime.start(config);
         },
         runtimeStarted: function() {
@@ -407,8 +401,7 @@ const main = function() {
             through each registered plugin's onRuntimeReady method, and begin
             evaluating any code in the pendingScripts queue.
             */
-            let duration = new Date() - start;
-            logger(`Runtime started (${duration}ms). 🎬`);
+            logger(`Runtime started. 🎬`);
             runtimeReady = true;
             plugins.forEach(function(plugin) {
                 plugin.onRuntimeReady(config, runtime);

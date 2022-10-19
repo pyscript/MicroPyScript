@@ -33,16 +33,17 @@ const main = function() {
 
     * Keep the bare minimum of state.
     * Load and process any configuration from the page.
-    * Provide a mechanism for PyScriptPlugin based plugins to be registered,
-      configured and then started.
+    * Provide a mechanism for plugins to be registered, configured and then
+      started.
     * Load and start the Python runtime.
     * Dispatch the following events to signal various changes in state or the
       completion of tasks (such as starting the runtime).
         - "py-configured", when configuration is processed.
         - "py-plugin-registered", when a plugin is registered.
+        - "py-plugin-started", when a plugin is started.
         - "py-runtime-loaded", when the runtime has been downloaded.
         - "py-runtime-ready", when the runtime is ready to process Python.
-    * Define, configure and start the built-in PyScript plugins (e.g. the 
+    * Define, configure and start built-in PyScript plugins (e.g. the 
       <py-script> tag).
     **************************************************************************/
 
@@ -336,11 +337,6 @@ const main = function() {
         eval(script) {
             this.pyodide.runPython(script.code);
         }
-    }
-
-    // An object to represent the PyScript platform in the browser. What is
-    // eventually returned from the main() function.
-    const PyScript = {
     }
 
     // Default configuration settings for PyScript. These may be overridden by

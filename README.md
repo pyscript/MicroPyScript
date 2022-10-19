@@ -105,16 +105,16 @@ The story of PyScript's execution is roughly as follows:
      plugin registered a `py-plugin-registered` event is dispatched, containing
      the (potentially changed) `config`, and a reference to the newly registered
      plugin.
-3. When `py-runtime-loaded` is dispatched the `config` is frozen and two things
-   happen:
+3. When `py-runtime-loaded` is dispatched two things happen:
    * The runtime is instantiated / started. Once complete the `py-runtime-ready`
      event is dispatched.
-   * All registered plugins have their `start` function called. 
+   * All registered plugins have their `start` function called and a
+     `py-plugin-started` event is dispatched for each plugin.
 4. When the `py-runtime-ready` event is dispatched all plugins have their
    `onRuntimeReady` function called with the `config` and `runtime` objects.
 5. Any plugins registered after the runtime is ready immediately have their
    `configure`, `start` and `onRuntimeReady` functions called, with the
-   `py-plugin-registered` event being dispatched.
+   `py-plugin-registered` and `py-plugin-started` events being dispatched.
 
 That's it!
 
@@ -227,7 +227,7 @@ Then in your HTML file:
 ```
 
 A good example of a plugin is the built-in plugin for the `<py-script>` tag
-found in `pyscript.js` (search for pyScriptTag).
+found in `pyscript.js` (search for the object assigned to `pyScriptTag`).
 
 ## Runtimes
 

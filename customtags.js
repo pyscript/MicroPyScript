@@ -20,7 +20,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ******************************************************************************/
 
-class PyREPLTag extends Plugin {
+const pyReplTag = function(e) {
     /*
     Adds a REPL to the DOM. The REPL session is only initialised when the
     runtime is ready. The content of the REPL is inserted in the following
@@ -33,22 +33,35 @@ class PyREPLTag extends Plugin {
     arrangement of tags will make it look like a TTY session). Bespoke CSS
     should use the pyscriptREPL class to attach styling.
     */
-    start(config) {
-        // Define the py-repl element.
-        class PyREPL extends HTMLElement {
-            connectedCallback() {
-                /*
-                Create a shadow DOM with the expected child elements and event
-                handlers defined in it.
-                */
-                const shadow = this.attachShadow({ mode: "open" });
-                const pre = document.createElement("pre");
-                pre.setAttribute("class", "pyscriptREPL");
-                const code = document.createElement("code");
-                pre.appendChild(code);
-                shadow.appendChild(pre);
+
+    const plugin = {
+        configure: function(config) {
+            // Just set a flag to indicate that a REPL is active.
+            config.repl = true
+        },
+        start: function(config) {
+            // Define the py-repl element.
+            class PyREPL extends HTMLElement {
+                connectedCallback() {
+                    /*
+                    Create a shadow DOM with the expected child elements and
+                    event handlers defined in it.
+                    */
+                    const shadow = this.attachShadow({ mode: "open" });
+                    const pre = document.createElement("pre");
+                    pre.setAttribute("class", "pyscriptREPL");
+                    const code = document.createElement("code");
+                    pre.appendChild(code);
+                    shadow.appendChild(pre);
+                }
             }
+            customElements.define("py-repl", PyREPL);
+        },
+        onRuntimeReady: function(config, runtime) {
+            // 
         }
-        customElements.define("py-repl", PyREPL);
-    }
-}
+    };
+
+    window.pyScript.registerPlugin(plugin);
+};
+document.addEventListener("py-configured", pyReplTag);

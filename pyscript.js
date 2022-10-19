@@ -511,7 +511,6 @@ const main = function() {
     function onRuntimeLoaded(e) {
         /*
         The runtime has loaded over the network.
-            - Freeze the config so it can't be changed from this point.
             - Start the runtime in this PyScript context.
             - Start the plugins to kick off Pythonic aspects of the page.
         */

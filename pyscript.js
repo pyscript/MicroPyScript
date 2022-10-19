@@ -422,7 +422,7 @@ const main = function() {
             startPlugin(plugin)
             plugin.onRuntimeReady?.(config, runtime);
         }
-        const pyPluginRegistered = new CustomEvent("py-plugin-registered", {detail: { config: config, plugin: plugin});
+        const pyPluginRegistered = new CustomEvent("py-plugin-registered", {detail: { config: config, plugin: plugin}});
         document.dispatchEvent(pyPluginRegistered);
     }
 
@@ -441,7 +441,7 @@ const main = function() {
         */
         logger(`Starting plugin "${plugin.name}" ⚡`);
         plugin.start?.(config);
-        const pyPluginStarted = new CustomEvent("py-plugin-started", {detail: { config: config, plugin: plugin});
+        const pyPluginStarted = new CustomEvent("py-plugin-started", {detail: { config: config, plugin: plugin}});
         document.dispatchEvent(pyPluginStarted);
     }
 

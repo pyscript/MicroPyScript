@@ -35,6 +35,7 @@ const pyReplTag = function(e) {
     */
 
     const plugin = {
+        name: "py-repl",
         configure: function(config) {
             // Just set a flag to indicate that a REPL is active.
             config.repl = true

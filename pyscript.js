@@ -279,7 +279,7 @@ const main = function() {
             if(config.mp_memory) {
                 mp_memory = config.mp_memory;
             }
-            document.addEventListener('mp-print', function(e) {
+            document.addEventListener('micropython-print', function(e) {
                 Runtime.print(e.data);
             }, false);
             let mp_js_startup = Module['onRuntimeInitialized'];

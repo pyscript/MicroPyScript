@@ -1,6 +1,6 @@
 "use strict";
 /******************************************************************************
-MicroPyscript.
+MicroPyScript.
 
 A small, simple, single file kernel of PyScript, made for testing purposes.
 
@@ -77,6 +77,14 @@ const main = function() {
             document.dispatchEvent(pyRuntimeReady);
         }
 
+        static print(output) {
+            /*
+            Dispatch the py-print event (for when output is printed).
+            */
+            const pyPrint = new CustomEvent("py-print", {detail: output})
+            document.dispatchEvent(pyPrint);
+        }
+
         start(config) {
             /*
             Instantiate, setup, configure and do whatever else is needed to
@@ -107,7 +115,7 @@ const main = function() {
     // The innerHTML of the default splash screen to show while PyScript is
     // starting up. Currently the page is greyed out and the words
     // "Loading PyScript...".
-    const defaultSplash= '<div style="position:fixed;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:99999;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);-ms-transform:translate(-50%,-50%);color:white;font-family:monospace;font-size:10px;">Loading PyScript...</div></div>';
+    const defaultSplash= '<div style="position:fixed;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:9999;"><div style="position:absolute;top:50%;left:50%;color:white;">Loading PyScript...</div></div>';
 
     /**************************************************************************
     Built-in plugins and runtimes.
@@ -123,7 +131,11 @@ const main = function() {
         const pendingScripts = [];
 
         // Eventually references the available runtime, once ready.
-        var availableRuntime = null;
+        let availableRuntime = null;
+
+        // Eventually references the first <py-script> tag into which all
+        // stdout will be piped.
+        let stdoutTag = null;
 
         function registerScript(e) {
             /*
@@ -191,6 +203,16 @@ const main = function() {
             availableRuntime.eval(e.detail);
         }
 
+        function onPrint(e) {
+            /*
+            Handle print to stdout events.
+            */
+            if (stdoutTag === null) {
+                stdoutTag = document.querySelector("py-script");
+            }
+            stdoutTag.innerText = stdoutTag.innerText + e.detail;
+        }
+
         document.addEventListener("py-script-registered", registerScript);
         document.addEventListener("py-script-loaded", scriptLoaded);
         document.addEventListener("py-eval-script", evaluateScript);
@@ -220,6 +242,7 @@ const main = function() {
                         };
                         const pyScriptRegistered = new CustomEvent("py-script-registered", {"detail": script});
                         document.dispatchEvent(pyScriptRegistered);
+                        document.addEventListener("py-print", onPrint);
                     }
                 }
                 // Register it (thus extracting the code from the page).
@@ -256,9 +279,8 @@ const main = function() {
             if(config.mp_memory) {
                 mp_memory = config.mp_memory;
             }
-            // TODO: Fix this.
-            mp_js_stdout.addEventListener('print', function(e) {
-                this.innerText = this.innerText + e.data;
+            document.addEventListener('mp-print', function(e) {
+                Runtime.print(e.data);
             }, false);
             let mp_js_startup = Module['onRuntimeInitialized'];
             Module["onRuntimeInitialized"] = async function() {
@@ -301,13 +323,25 @@ const main = function() {
 
     class PyodideRuntime extends Runtime {
         /*
-        Pyodide if a Python distribution for the browser, compiled to WASM. For
+        Pyodide is a Python distribution for the browser, compiled to WASM. For
         more information, see:
 
         https://pyodide.org/en/stable/
 
         TODO: Finish this. It's a hack!
         */
+
+        constructor() {
+            super();
+            // Read and emptied when Pyodide calls the stdin_func to read user
+            // input. (This feels wrong, but that's just how Pyodide works.)
+            this.stdInBuffer = [];
+            this.repr_shorten = null;
+            this.banner = null;
+            this.await_fut = null;
+            this.pyconsole = null;
+            this.clear_console = null;
+        }
 
         static get url() {
             return "https://cdn.jsdelivr.net/pyodide/v0.21.3/full/pyodide.js";
@@ -318,11 +352,18 @@ const main = function() {
                 if (output === "Python initialization complete") {
                     return;
                 }
-                mp_js_stdout.innerText += output + "\n";
+                Runtime.print(output);
+            };
+            const stdin_func = function() {
+                return null;
+                let result = prompt();
+                echo(result);
+                return result;
             };
             async function main() {
                 let pyodide = await loadPyodide({
-                    stdout: stdout_func
+                    stdout: stdout_func,
+                    stdin: stdin_func
                 });
                 return pyodide;
             }
@@ -336,6 +377,51 @@ const main = function() {
 
         eval(script) {
             this.pyodide.runPython(script.code);
+        }
+
+        startREPL() {
+            logger("Starting Pyodide REPL. ⌨️");
+            let namespace = this.pyodide.globals.get("dict")();
+            this.pyodide.runPython(
+              `
+                import sys
+                from pyodide.ffi import to_js
+                from pyodide.console import PyodideConsole, repr_shorten, BANNER
+                import __main__
+                BANNER = "Welcome to the Pyodide terminal emulator 🐍\\n" + BANNER
+                pyconsole = PyodideConsole(__main__.__dict__)
+                import builtins
+                async def await_fut(fut):
+                  res = await fut
+                  if res is not None:
+                    builtins._ = res
+                  return to_js([res], depth=1)
+                def clear_console():
+                  pyconsole.buffer = []
+              `,
+              { globals: namespace },
+            );
+            this.repr_shorten = namespace.get("repr_shorten");
+            this.banner = namespace.get("BANNER");
+            this.await_fut = namespace.get("await_fut");
+            this.pyconsole = namespace.get("pyconsole");
+            this.clear_console = namespace.get("clear_console");
+            namespace.destroy();
+            Runtime.print(this.banner);
+            this.pyconsole.stdout_callback = (output) => {
+                Runtime.print(output);
+            }
+        }
+
+        stdin(input) {
+            // Push the input to the stdInBuffer, which is read and cleared by
+            // Pyodide at some point in the future.
+            this.stdInBuffer.push(input);
+            Runtime.print(input);
+            if (input === "\r" && this.pyconsole) {
+                this.pyconsole.push(this.stdInBuffer.join("").trimEnd());
+                this.stdInBuffer = [];
+            }
         }
     }
 
@@ -527,12 +613,9 @@ const main = function() {
     // Finally, return a function to start PyScript.
     return function() {
         // Check to bypass loadConfig, for testing purposes.
-        if (!window.pyscriptTest) {
-            document.addEventListener("py-configured", onPyConfigured);
-            document.addEventListener("py-runtime-loaded", onRuntimeLoaded);
-            document.addEventListener("py-runtime-ready", onRuntimeReady);
-            loadConfig();
-        }
+        document.addEventListener("py-configured", onPyConfigured);
+        document.addEventListener("py-runtime-loaded", onRuntimeLoaded);
+        document.addEventListener("py-runtime-ready", onRuntimeReady);
         // An object to represent the PyScript platform in the browser. What is
         // eventually returned from the main() function.
         const pyScript = {
@@ -558,6 +641,9 @@ const main = function() {
                 if (runtimeReady) {
                     runtime.eval(code);
                 }
+            },
+            start: function() {
+                loadConfig();
             }
         };
         return pyScript;
@@ -569,3 +655,6 @@ const main = function() {
 Start PyScript.
 ******************************************************************************/
 window.pyScript = main();
+if (!window.pyscriptTest) {
+    window.pyScript.start();
+}

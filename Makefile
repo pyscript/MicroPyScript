@@ -28,3 +28,6 @@ serve:
 
 test:
 	python -m webbrowser "http://0.0.0.0:8000/SpecRunner.html"
+
+minify:
+	uglifyjs pyscript.js --compress --mangle -o pyscript.min.js

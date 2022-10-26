@@ -2,4 +2,6 @@ mpbuild
 pybuild
 micropython
 cpython
+pyodide
 emsdk
+pyscript.min.js

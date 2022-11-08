@@ -1,13 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Configurable interpreters</title>
+    <meta name="theme-color" content="#0b0c0c">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="stylesheet" href="static/gd.css">
+  </head>
   <body>
-    <py-config>
-    {
-      "runtime": "micropython"
-    }
-    </py-config>
-    <py-repl></py-repl>
+    <a href="#main-content" class="hide">Skip to main content</a>
+    <a name="top"></a>
+    <header>
+    <nav role="navigation">
+      <a href="/" style="text-decoration: none!important;";>
+        <img alt="Anaconda" src="static/logo.svg" width="54" height="54" style="display:inline;">
+        <img alt="Anaconda" src="static/anaconda.svg" height="54" style="display: inline; height: 42px;">
+      </a>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="https://github.com/pyscript/upys">Download</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main id="main-content">
+    <h1>PyScript Interpreters ~ A Technical Preview</h1>
+    <p><a href="https://pyscript.net">PyScipt</a> is an open-source platform,
+    using
+    <a href="https://webassembly.org/">web assembly</a> (WASM), for Python in
+    the browser.</p>
+
+    <p>Given this HTML fragment:</p>
+
+    <pre><code>&lt;py-script&gt;
+def hello(name="world"):
+  """
+  Return a friendly greeting.
+  """
+  return f"Hello, {name} (from PyScript)"
+
+print(hello())
+&lt;/py-script&gt;
+&lt;script src="pyscript.js" type="module"&gt;&lt;/script&gt;</code></pre>
+
+    <p>You get:</p>
+
+    <py-script>
+def hello(name="world"):
+  """
+  Return a friendly greeting.
+  """
+  return f"Hello, {name} (from PyScript)"
+
+print(hello())
+    </py-script>
+
+    <p>Why not "view-source" and see for yourself?</p>
+
+    <h3>What?</h3>
+    <p>The initial version of PyScript, demoed
+    <a href="https://www.youtube.com/watch?v=qKfkCY7cmBQ">in a keynote address
+    by Peter Wang</a> at PyCon 2022, built on the amazing
+    work of the <a href="https://pyodide.org/en/stable/">Pyodide</a>
+    project. But Pyodide isn't the only Python interpreter, compiled to WASM,
+    that could be used for this purpose.</p>
+
+    <p>These pages are a technical demonstration, proof of concept and
+    playful exploration of how PyScript may work with other scripting language
+    interpreters. This initial work focused on the amazing work of the
+    <a href="https://micropython.org">MicroPython</a> project (a full
+    re-implementation of Python 3 targeting constrained computing
+    environments).</p>
+
+    <p>Here's what
+    <a href="http://dpgeorge.net/">Damien George</a>
+    (creator of MicroPython) says about such efforts:</p>
+
+    <blockquote>
+      <p>MicroPython was written from day one to be easy to embed, and tries to support a wide variety of targets.  For example, in a minimal configuration, the only connection to the external world that it needs is a place to output characters.</p>
+      <p>Although I never had the idea that MicroPython would be embedded in the browser, it actually fits quite naturally because MicroPython is very self contained.  MicroPython's small size and efficient use of resources (RAM and CPU) means that it's well suited to being embedded in a webpage, because the download size and start-up time is minimised.  It's pretty exciting to think that MicroPython could gain traction as a way to build websites.</p>
+    </blockquote>
+
+    <h3>Why?</h3>
+
+    <p>Different interpreters exhibit different strengths and weaknesses. As
+    always, there are tradeoffs.</p>
+
+    <p>Whereas Pyodide is a relatively mature version of standard CPython,
+    including powerful native modules such as
+    <a href="https://numpy.org/">numpy</a> and
+    <a href="https://scipy.org/">scipy</a>, it's also rather large (circa 11Mb)
+    and slow to start up (there's a noticeable pause of a second or more at
+    startup, even on beefy hardware).</p>
+
+    <p>Alternatively, MicroPython is a highly regarded, mature and
+    battle tested reimplementation of Python 3 but with "micro"
+    reimplementations of popular libraries. It is small (circa 500k) and
+    startup time is only a few thousandths of a second (from a warm cache),
+    even on mobile devices.</p>
+
+    <p>Given such tradeoffs, we want folks to be able to choose the interpreter
+    to use with PyScript that best suits their unique requirements.</p>
+
+    <h3>How?</h3>
+
+    <p>The code on these pages is experimental.</p>
+
+    <p>A small, fast and simple implementation of PyScript, created for
+    testing purposes, allows us to quickly explore the
+    characteristics of different potential interpreters.</p>
+    <p>This version of PyScript simply does four things:</p>
+    <ol>
+      <li>Read custom configuration (more on this later), otherwise fall back
+      to sensible defaults.</li>
+      <li>Download and start the interpreter. Currently, this is
+      configured to be MicroPython by default.</li>
+      <li>Register and manage plugins that contain the PyScript platform's
+      logic. Currently, there are two: one for the
+      <code>&lt;py-script&gt;</code> tag,
+      and one for the <code>&lt;py-repl&gt;</code> tag.</li>
+      <li>Load user defined files onto the interpreter's virtual file system (data,
+      code, modules etc).</li>
+    </ol>
+    <p>Drop into the browser console to see what PolyScript is doing, under the
+    hood.</p>
+    <a href="script.html"><button>Next: Configuration</button></a>
+  </main>
+  <footer>
+    <main>
+      <section>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="https://github.com/pyscript/upys">Download</a></li>
+        </ul>
+        <article>
+          <p>Made with ❤️  by folks at <a href="https://anaconda.com" rel="noopener">Anaconda Inc</a>.<br>
+            💡Inspired by the great work at <a href="https://micropython.org/" rel="noopener">MicroPython</a>.<br><br>
+        </article>
+      </section>
+    </main>
+  </footer>
   </body>
-  <script src="customtags.js"></script>
   <script src="pyscript.js" type="module"></script>
 </html>

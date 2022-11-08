@@ -12,6 +12,7 @@ all:
 setup:
 	git clone https://github.com/emscripten-core/emsdk.git
 	git clone https://github.com/micropython/micropython.git
+	git clone https://github.com/v923z/micropython-ulab.git
 
 update:
 	cd emsdk && git pull && ./emsdk install latest && ./emsdk activate latest
@@ -20,7 +21,7 @@ mp:
 	rm -rf mpbuild
 	rm -rf micropython/ports/webassembly/build
 	$(MAKE) -C micropython/mpy-cross
-	./emsdk/emsdk activate latest && source emsdk/emsdk_env.sh && $(MAKE) -C micropython/ports/webassembly
+	./emsdk/emsdk activate latest && source emsdk/emsdk_env.sh && $(MAKE) -C micropython/ports/webassembly USER_C_MODULES=../../../micropython-ulab/
 	cp -r micropython/ports/webassembly/build mpbuild
 
 serve:

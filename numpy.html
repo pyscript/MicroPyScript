@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Configurable runtimes</title>
+    <meta name="theme-color" content="#0b0c0c">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="stylesheet" href="static/gd.css">
+  </head>
+  <body>
+    <py-config>
+    {
+      "interpreter": "micropython",
+      "files": {
+        "arrr.py": "/arrr.py"
+      }
+    }
+    </py-config>
+    <a href="#main-content" class="hide">Skip to main content</a>
+    <a name="top"></a>
+    <header>
+    <nav role="navigation">
+      <a href="/" style="text-decoration: none!important;";>
+        <img alt="Anaconda" src="static/logo.svg" width="54" height="54" style="display:inline;">
+        <img alt="Anaconda" src="static/anaconda.svg" height="54" style="display: inline; height: 42px;">
+      </a>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="https://github.com/pyscript/upys">Download</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main id="main-content">
+    <h2>Native Modules</h2>
+
+    <p>There are numerous pure-Python modules that work with MicroPython.
+    However, some of the most interesting involve C-based extensions, with the
+    most well known being data science tools like
+    <a href="https://numpy.org/">numpy</a> and
+    <a href="https://scipy.org/">scipy</a>.</p>
+
+    <p>These C-based extensions can be compiled to WASM, in exactly the same
+    way that Python runtimes (written in C) are compiled to WASM.</p>
+    
+    <p>The version of MicroPython emebedded in the following REPL also
+    includes a WASM compiled tool called
+    <a href="https://micropython-ulab.readthedocs.io/en/latest/index.html">uLab</a> ("micro lab").
+    This is a small reimplementation of the core functions, for effieciently
+    working with numeric arrays found, in the numpy
+    and scipy modules. It is clearly not a complete re-implementation, but
+    serves to prove that such bespoke C-based extensions can be used with the
+    MicroPython runtime.</p>
+
+    <py-repl></py-repl>
+
+    <p>Why not try:</p>
+
+    <pre><code>&gt;&gt;&gt; import ulab
+&gt;&gt;&gt; np = ulab.numpy
+&gt;&gt;&gt; a = np.arange(6)
+&gt;&gt;&gt; a
+array([0, 1, 2, 3, 4, 5], dtype=int16)
+&gt;&gt;&gt; b = a.reshape((2, 3))
+&gt;&gt;&gt; b
+array([[0, 1, 2],
+       [3, 4, 5]], dtype=int16)
+&gt;&gt;&gt; np.sqrt(b)
+array([[0.0, 1.0, 1.414213562373095],
+       [1.732050807568877, 2.0, 2.23606797749979]], dtype=float64)</code></pre>
+
+    <a href="repl.html"><button>Previous: The REPL</button></a>
+  </main>
+  <footer>
+    <main>
+      <section>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="https://github.com/pyscript/upys">Download</a></li>
+        </ul>
+        <article>
+          <p>Made with ❤️  by folks at <a href="https://anaconda.com" rel="noopener">Anaconda Inc</a>.<br>
+            💡Inspired by the great work at <a href="https://micropython.org/" rel="noopener">MicroPython</a>.<br><br>
+        </article>
+      </section>
+    </main>
+  </footer>
+  </body>
+  <script src="customtags.js"></script>
+  <script src="pyscript.js" type="module"></script>
+</html>

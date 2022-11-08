@@ -1,6 +1,7 @@
 mpbuild
 pybuild
 micropython
+micropython-ulab
 cpython
 pyodide
 emsdk

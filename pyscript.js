@@ -1,8 +1,9 @@
 "use strict";
 /******************************************************************************
-MicroPyScript.
+MicroPyScript. 🐍
 
-A small, simple, single file kernel of PyScript, made for testing purposes.
+A small, simple, single file kernel of getting scripting languages into the
+browser, made for testing purposes and technical exploration.
 
 See the README for more details, design decisions, and an explanation of how
 things work.
@@ -27,7 +28,7 @@ limitations under the License.
 
 const main = function() {
     /**************************************************************************
-    The core PyScript app definition.
+    The core MicroPyScript app definition.
 
     Its main concern is to:
 
@@ -35,51 +36,59 @@ const main = function() {
     * Load and process any configuration from the page.
     * Provide a mechanism for plugins to be registered, configured and then
       started.
-    * Load and start the Python runtime.
+    * Load and start the scripting language interpreter.
     * Dispatch the following events to signal various changes in state or the
-      completion of tasks (such as starting the runtime).
+      completion of tasks (such as starting the interpreter).
         - "py-configured", when configuration is processed.
         - "py-plugin-registered", when a plugin is registered.
         - "py-plugin-started", when a plugin is started.
-        - "py-runtime-loaded", when the runtime has been downloaded.
-        - "py-runtime-ready", when the runtime is ready to process Python.
-    * Define, configure and start built-in PyScript plugins (e.g. the 
+        - "py-interpreter-loaded", when the interpreter has been downloaded.
+        - "py-interpreter-ready", when the interpreter is ready to process
+          Python for configuration reasons.
+        - "py-file-fetched", when a file, to be added to the interpreter's
+          filesystem, has been fetched from the network.
+        - "py-files-loaded", when all the files have been copied onto the
+          interpreter's filesystem.
+        - "py-finished-setup", when the interpreter and filesystem are both
+          ready. At this point, PyScript is ready to evaluate user's code.
+    * Define, configure and start built-in MicroPyScript plugins (e.g. the 
       <py-script> tag).
     **************************************************************************/
 
     const logger = function() {
         /*
-        Really simple logging. Emoji 🐍 highlights PyScript app logs. ;-)
+        Really simple logging. Emoji 🐍 highlights MicroPyScript app logs. ;-)
         */
         return Function.prototype.bind.call(console.log, console, "🐍 ", ...arguments);
     }();
-    logger("Starting PyScript. 👋");
+    logger("Starting MicroPyScript. 👋🐍");
 
-    class Runtime {
+    class Interpreter {
         /*
-        Defines and encapsulates a runtime used by PyScript to evaluate Python
-        code or run an interactive REPL.
+        Defines and encapsulates a interpreter used by MicroPyScript to evaluate
+        code or run an interactive REPL with a scripting language compiled to
+        WASM.
         */
 
         static get url() {
             /*
-            The URL pointing to where to download the runtime.
+            The URL pointing to where to download the interpreter.
             */
             return "";
         }
 
         static ready() {
             /*
-            Dispatch the py-runtime-ready event (for when the runtime has
+            Dispatch the py-interpreter-ready event (for when the interpreter has
             eventually started and is ready to evaluate code).
             */
-            const pyRuntimeReady = new CustomEvent("py-runtime-ready", this);
-            document.dispatchEvent(pyRuntimeReady);
+            const pyInterpreterReady = new CustomEvent("py-interpreter-ready", this);
+            document.dispatchEvent(pyInterpreterReady);
         }
 
         static print(output) {
             /*
-            Dispatch the py-print event (for when output is printed).
+            Dispatch the polly-print event (for when output is printed).
             */
             const pyPrint = new CustomEvent("py-print", {detail: output})
             document.dispatchEvent(pyPrint);
@@ -88,37 +97,44 @@ const main = function() {
         start(config) {
             /*
             Instantiate, setup, configure and do whatever else is needed to
-            start the runtime. This is called once the runtime is loaded into
+            start the interpreter. This is called once the interpreter is loaded into
             the browser.
             */
         }
 
         eval(script) {
             /*
-            Use the runtime to evaluate the script.code.
+            Use the interpreter to evaluate the script.code.
+            */
+        }
+
+        addFile(path, content) {
+            /*
+            Copy a file with the referenced path, and content, onto the local
+            filesystem available to the interpreter.
             */
         }
 
         startREPL() {
             /*
-            Start an interactive REPL session with the runtime.
+            Start an interactive REPL session with the interpreter.
             */
         }
 
         stdin(input) {
             /*
-            Pass the input into the runtime's stdin.
+            Pass the input into the interpreter's stdin.
             */
         }
     }
 
-    // The innerHTML of the default splash screen to show while PyScript is
+    // The innerHTML of the default splash screen to show while MicroPyScript is
     // starting up. Currently the page is greyed out and the words
-    // "Loading PyScript...".
-    const defaultSplash= '<div style="position:fixed;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:9999;"><div style="position:absolute;top:50%;left:50%;color:white;">Loading PyScript...</div></div>';
+    // "Loading MicroPyScript...".
+    const defaultSplash= '<div style="position:fixed;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:9999;"><div style="position:absolute;top:50%;left:40%;color:white;">Loading MicroPyScript... 🐍</div></div>';
 
     /**************************************************************************
-    Built-in plugins and runtimes.
+    Built-in plugins and interpreters.
     **************************************************************************/
 
     const pyScriptTag = function(){
@@ -127,11 +143,11 @@ const main = function() {
         const scripts = [];
 
         // Contains Python scripts whose source code is available, and pending 
-        // evaluation by the runtime.
+        // evaluation by the interpreter.
         const pendingScripts = [];
 
-        // Eventually references the available runtime, once ready.
-        let availableRuntime = null;
+        // Eventually references the available interpreter, once ready.
+        let availableInterpreter = null;
 
         // Eventually references the first <py-script> tag into which all
         // stdout will be piped.
@@ -155,7 +171,7 @@ const main = function() {
                 // Handle asynchronous loading of the script's code from the
                 // URL in src.
                 fetch(script.src).then(function(response) {
-                    logger(`Fetched script from "${script.src}" 📡`, response);
+                    logger(`Fetched script from "${script.src}". 📡`, response);
                     if (response.ok) {
                         response.text().then((data) => {
                             script.code = data;
@@ -179,28 +195,28 @@ const main = function() {
             /*
             The given script is ready to be evaluated.
 
-            Either queue it for later evaluation if the runtime isn't ready
-            yet, or dispatch the py-eval-script event to signal to the runtime
+            Either queue it for later evaluation if the interpreter isn't ready
+            yet, or dispatch the py-eval-script event to signal to the interpreter
             it should evaluate the script.
             */
-            if (availableRuntime) {
-                // Runtime is ready, so evaluate the code.
+            if (availableInterpreter) {
+                // Interpreter is ready, so evaluate the code.
                 const pyEvalScript = new CustomEvent("py-eval-script", {detail: e.detail});
                 document.dispatchEvent(pyEvalScript);
             } else {
-                // No runtime, so add to pendingScripts queue, to be evaluated
-                // once the runtime is ready.
+                // No interpreter, so add to pendingScripts queue, to be evaluated
+                // once the interpreter is ready.
                 pendingScripts.push(e.detail);
             }
         }
 
         function evaluateScript(e) {
             /*
-            Given the runtime is ready AND the script is loaded,
-            evaluate the script with the runtime.
+            Given the interpreter is ready AND the script is loaded,
+            evaluate the script with the interpreter.
             */
             logger("Evaluating code. 🤖\n" + e.detail.code);
-            availableRuntime.eval(e.detail);
+            availableInterpreter.eval(e.detail);
         }
 
         function onPrint(e) {
@@ -208,7 +224,11 @@ const main = function() {
             Handle print to stdout events.
             */
             if (stdoutTag === null) {
-                stdoutTag = document.querySelector("py-script");
+                const firstPyScriptTag = document.querySelector("py-script");
+                const preTag = document.createElement("pre");
+                firstPyScriptTag.appendChild(preTag);
+                stdoutTag = document.createElement("code");
+                preTag.appendChild(stdoutTag);
             }
             stdoutTag.innerText = stdoutTag.innerText + e.detail;
         }
@@ -218,7 +238,7 @@ const main = function() {
         document.addEventListener("py-eval-script", evaluateScript);
 
         // The object to contain the various functions needed to handle the
-        // life cycle of this plugin, returned to the PyScript environment.
+        // life cycle of this plugin, returned to the MicroPyScript environment.
         const plugin = {
             name: "py-script",
             start: function(config) {
@@ -248,8 +268,8 @@ const main = function() {
                 // Register it (thus extracting the code from the page).
                 customElements.define('py-script', PyScript);
             },
-            onRuntimeReady: function(config, runtime) {
-                availableRuntime = runtime;
+            onInterpreterReady: function(config, interpreter) {
+                availableInterpreter = interpreter;
                 // Evaluate any pending scripts.
                 pendingScripts.forEach(function(script) {
                     const pyEvalScript = new CustomEvent("py-eval-script", {detail: script});
@@ -262,7 +282,7 @@ const main = function() {
         return plugin;
     }();
 
-    class MicroPythonRuntime extends Runtime {
+    class MicroPythonInterpreter extends Interpreter {
         /*
         MicroPython (https://micropython.org) is a lean and efficient
         implementation of the Python 3 programming language that includes a
@@ -280,18 +300,22 @@ const main = function() {
                 mp_memory = config.mp_memory;
             }
             document.addEventListener('micropython-print', function(e) {
-                Runtime.print(e.data);
+                Interpreter.print(e.data);
             }, false);
             let mp_js_startup = Module['onRuntimeInitialized'];
             Module["onRuntimeInitialized"] = async function() {
                 mp_js_startup();
                 mp_js_init(mp_memory);
-                Runtime.ready();
+                Interpreter.ready();
             }
         }
 
         eval(script) {
             mp_js_do_str(script.code);
+        }
+
+        addFile(path, content) {
+            Module.FS.writeFile(path, content);
         }
 
         startREPL() {
@@ -306,7 +330,7 @@ const main = function() {
         }
     }
 
-    class CPythonRuntime extends Runtime {
+    class CPythonInterpreter extends Interpreter {
         /*
         The standard CPython version of Python compiled to WASM. For more
         information, see:
@@ -321,7 +345,7 @@ const main = function() {
         }
     }
 
-    class PyodideRuntime extends Runtime {
+    class PyodideInterpreter extends Interpreter {
         /*
         Pyodide is a Python distribution for the browser, compiled to WASM. For
         more information, see:
@@ -341,10 +365,16 @@ const main = function() {
             this.await_fut = null;
             this.pyconsole = null;
             this.clear_console = null;
+            this.term = null;
         }
 
         static get url() {
             return "https://cdn.jsdelivr.net/pyodide/v0.21.3/full/pyodide.js";
+        }
+
+        print(output) {
+            let processed_output = output.replaceAll("\n", "\n\r");
+            Interpreter.print(processed_output);
         }
 
         start(config) {
@@ -352,13 +382,10 @@ const main = function() {
                 if (output === "Python initialization complete") {
                     return;
                 }
-                Runtime.print(output);
+                this.print(output);
             };
             const stdin_func = function() {
                 return null;
-                let result = prompt();
-                echo(result);
-                return result;
             };
             async function main() {
                 let pyodide = await loadPyodide({
@@ -371,7 +398,7 @@ const main = function() {
             const myself = this;
             pyodideReadyPromise.then(result => {
                 myself.pyodide = result;
-                Runtime.ready()
+                Interpreter.ready()
             });
         }
 
@@ -379,7 +406,14 @@ const main = function() {
             this.pyodide.runPython(script.code);
         }
 
-        startREPL() {
+        addFile(path, content) {
+            this.pyodide.FS.writeFile(path, content);
+        }
+
+        startREPL(term) {
+            term.prompt = () => {
+                term.write("\r\n>> ");
+            }
             logger("Starting Pyodide REPL. ⌨️");
             let namespace = this.pyodide.globals.get("dict")();
             this.pyodide.runPython(
@@ -388,7 +422,6 @@ const main = function() {
                 from pyodide.ffi import to_js
                 from pyodide.console import PyodideConsole, repr_shorten, BANNER
                 import __main__
-                BANNER = "Welcome to the Pyodide terminal emulator 🐍\\n" + BANNER
                 pyconsole = PyodideConsole(__main__.__dict__)
                 import builtins
                 async def await_fut(fut):
@@ -407,57 +440,123 @@ const main = function() {
             this.pyconsole = namespace.get("pyconsole");
             this.clear_console = namespace.get("clear_console");
             namespace.destroy();
-            Runtime.print(this.banner);
+            this.print(this.banner);
+            this.print("\r\n>>> ")
             this.pyconsole.stdout_callback = (output) => {
-                Runtime.print(output);
+                this.print(output);
             }
+            this.term = term;
         }
 
         stdin(input) {
             // Push the input to the stdInBuffer, which is read and cleared by
             // Pyodide at some point in the future.
-            this.stdInBuffer.push(input);
-            Runtime.print(input);
-            if (input === "\r" && this.pyconsole) {
-                this.pyconsole.push(this.stdInBuffer.join("").trimEnd());
+            if (input === "\u007F") {
+                // Delete
+                if (this.stdInBuffer.length > 0) {
+                    this.print("\b \b");
+                }
+                this.stdInBuffer = this.stdInBuffer.slice(0, -1);
+            } else if (input === "\r" && this.pyconsole) {
+                const code = this.stdInBuffer.join("").trimEnd();
                 this.stdInBuffer = [];
+                let fut = this.pyconsole.push(code);
+                switch (fut.syntax_check) {
+                  case "syntax-error":
+                    this.print(fut.formatted_error.trimEnd());
+                    break;
+                  case "incomplete":
+                    this.print("\r\n... ");
+                    break;
+                  case "complete":
+                    this.print("\r\n>>> ");
+                    break;
+                  default:
+                    throw new Error(`Unexpected type ${fut.syntax_check}`);
+                }
+                let wrapped = this.await_fut(fut);
+                wrapped.then(value => {
+                  if (value !== undefined) {
+                    const output = this.repr_shorten.callKwargs(value, {
+                        separator: "\n<long output truncated>\n",
+                        limit: 99999
+                    }).trimEnd();
+                    if (output) {
+                        this.term.write("\x1b[2K\r");  // clear line
+                        this.print(output + "\r\n>>> ");
+                    }
+                  }
+                  if (this.pyodide.isPyProxy(value)) {
+                    value.destroy();
+                  }
+                }).catch(e => {
+                  if (e.constructor.name === "PythonError") {
+                    this.term.write("\x1b[2K\r");  // clear line
+                    const message = fut.formatted_error || e.message;
+                    this.print(message.trimEnd().replace(/\n/g, "\r\n") + "\r\n>>> ");
+                  } else {
+                    throw e;
+                  }
+                }).finally(() => {
+                  fut.destroy();
+                  wrapped.destroy();
+                });
+            } else {
+                this.stdInBuffer.push(input);
+                this.print(input);
             }
         }
     }
 
-    // Default configuration settings for PyScript. These may be overridden by
-    // the app.loadConfig function.
+    // Default configuration settings for MicroPyScript. These may be overridden
+    // by the app.loadConfig function.
+    // The "files" object should look like this:
+    // "files": {
+    //   "myfile.py": "https://domain.com/myfile.py",
+    //   "myotherfile.txt": "otherfile.txt"
+    // }
+    // Key: filename on WASM filesystem.
+    // Value: url to download content of file.
     const config = {
-        "runtime": "micropython",  // Numpty default.
-        "splash": defaultSplash  // loading message in grey overlay.
+        "interpreter": "micropython",  // Numpty default.
+        "splash": defaultSplash,  // loading message in grey overlay.
+        "files": {}  // No files by default.
     }
 
-    // Contains plugins to the PyScript context.
+    // Contains plugins to the MicroPyScript context.
     const plugins = [];
 
-    // Details of runtimes.
-    // Key: lowercase runtime name.
-    // Value: the class wrapping that version of the runtime.
-    const runtimes = {
-        "micropython": MicroPythonRuntime,
-        "cpython": CPythonRuntime,
-        "pyodide": PyodideRuntime
+    // Details of interpreters.
+    // Key: lowercase interpreter name.
+    // Value: the class wrapping that version of the interpreter.
+    const interpreters = {
+        "micropython": MicroPythonInterpreter,
+        "cpython": CPythonInterpreter,
+        "pyodide": PyodideInterpreter
     }
 
-    // Eventually references an instance of the Runtime class, representing the
-    // started runtime.
-    let runtime = null;
+    // Files to be loaded to the filesystem once the interpreter is loaded (but
+    // perhaps not yet ready).
+    const filesToLoad = [];
 
-    // Flag to indicate the runtime is ready to evaluate scripts.
-    let runtimeReady = false;
+    // Eventually references an instance of the Interpreter class, representing the
+    // started interpreter.
+    let interpreter = null;
+
+    // Flag to indicate that all the files to be copied into the filesystem
+    // (defined in config) have been downloaded and copied over.
+    let filesLoaded = false;
+
+    // Flag to indicate the interpreter is ready to evaluate scripts.
+    let interpreterReady = false;
 
     // To hold a reference to the div containing the start-up splash screen
-    // displayed while PyScript starts up.
+    // displayed while MicroPyScript starts up.
     let splashElement = null;
 
     function loadConfig() {
         /*
-        Loads configuration for running PyScript from JSON contained in the
+        Loads configuration for running MicroPyScript from JSON contained in the
         py-config element. Updates the default config object. Dispatches a
         py-configured event when done.
         */
@@ -477,7 +576,7 @@ const main = function() {
 
     function splashOn() {
         /*
-        Display the splash screen for when PyScript is starting.
+        Display the splash screen for when MicroPyScript is starting.
         */
         splashElement = document.createElement("div");
         splashElement.innerHTML = config.splash;
@@ -487,22 +586,22 @@ const main = function() {
 
     function splashOff() {
         /*
-        Remove the splash screen, once PyScript is finished starting.
+        Remove the splash screen, once MicroPyScript is finished starting.
         */
         splashElement.parentNode.removeChild(splashElement);
     }
 
     function registerPlugin(plugin) {
         /*
-        Add a plugin to the PyScript context, after calling its configure
+        Add a plugin to the MicroPyScript context, after calling its configure
         method.
         */
-        logger(`Registering plugin "${plugin.name}" 🔌`);
+        logger(`Registering plugin "${plugin.name}". 🔌`);
         plugin.configure?.(config);
         plugins.push(plugin);
-        if (runtimeReady) {
+        if (interpreterReady) {
             startPlugin(plugin)
-            plugin.onRuntimeReady?.(config, runtime);
+            plugin.onInterpreterReady?.(config, interpreter);
         }
         const pyPluginRegistered = new CustomEvent("py-plugin-registered", {detail: { config: config, plugin: plugin}});
         document.dispatchEvent(pyPluginRegistered);
@@ -521,57 +620,143 @@ const main = function() {
         /*
         Start an individual plugin.
         */
-        logger(`Starting plugin "${plugin.name}" ⚡`);
+        logger(`Starting plugin "${plugin.name}". ⚡`);
         plugin.start?.(config);
         const pyPluginStarted = new CustomEvent("py-plugin-started", {detail: { config: config, plugin: plugin}});
         document.dispatchEvent(pyPluginStarted);
     }
 
-    function loadRuntime() {
+    function loadFiles() {
         /*
-        Given a configuration state, load the runtime specified therein and
-        dispatch a py-runtime-loaded event when done.
+        Download and add the config.files into the local filesystem accessible
+        by the interpreter.
+        */
+        // Holds the promises used to fetch the content of the files.
+        const pendingDownloads = [];
+        if (config.files) {
+            // Iterate the path and associated url (pointing at the content).
+            for (let path in config.files) {
+                let url = config.files[path];
+                logger(`Fetching file "${path}" from: ${url} 📡`);
+                // Create a new promise representing the fetch call.
+                const filePromise = fetch(url);
+                // Ensure the response is handled in the right way.
+                filePromise.then(response => {
+                    if (response.ok) {
+                        response.text().then(content => {
+                            if (interpreterReady) {
+                                // The interpreter exists, so just add the file to
+                                // its filesystem.
+                                const pyFileFetched = new CustomEvent("py-file-fetched", {detail: { path: path, content: content}});
+                                document.dispatchEvent(pyFileFetched);
+                            } else {
+                                // No interpreter (yet), so push onto the
+                                // filesToLoad queue so they're copied over
+                                // once the interpreter becomes available.
+                                filesToLoad.push({
+                                    path: path,
+                                    content: content
+                                });
+                            }
+                        })
+                    } else {
+                        // Abort.             
+                        throw `💥 Cannot load file from "${url}"`;
+                    }
+                });
+                // Add the promise to the pendingDownloads.
+                pendingDownloads.push(filePromise);
+            }
+        }
+        // A meta-promise that resolves when all the fetch promises have
+        // successfully resolved, then sets the filesLoaded flag, dispatches
+        // the "py-files-loaded" event and checks if MicroPyScript has finished
+        // setup.
+        Promise.all(pendingDownloads).then((values) => {
+            filesLoaded = true;
+            if (values) {
+                logger(`All files downloaded, copying to filesystem. 📥`);
+            }
+            const pyFilesLoaded = new CustomEvent("py-files-loaded");
+            document.dispatchEvent(pyFilesLoaded);
+            finished();
+        })
+    }
+
+    function onFileFetched(e) {
+        /*
+        Save the file's content to the path on the interpreter's local filesystem.
+        */
+        logger(`Saving file "${e.detail.path}" to file system. 💾`);
+        interpreter.addFile(e.detail.path, e.detail.content);
+    }
+
+    function loadInterpreter() {
+        /*
+        Given a configuration state, load the interpreter specified therein and
+        dispatch a py-interpreter-loaded event when done.
 
         TL;DR - a new script tag with the correct src is added to the head.
         */
-        if(!runtimes.hasOwnProperty(config.runtime)) {
-            throw `💥 Unknown runtime: "${config.runtime}" (known runtimes: ${Object.keys(runtimes)})`;
+        if(!interpreters.hasOwnProperty(config.interpreter)) {
+            throw `💥 Unknown interpreter: "${config.interpreter}" (known interpreters: ${Object.keys(interpreters)})`;
         }
-        const runtimeElement = document.createElement("script");
-        runtimeElement.src = runtimes[config.runtime.toLowerCase()].url;
-        runtimeElement.onload = function(e) {
-            logger(`Runtime "${config.runtime}" loaded. 👍`);
-            const pyRuntimeLoaded = new CustomEvent("py-runtime-loaded", {detail: config.runtime});
-            document.dispatchEvent(pyRuntimeLoaded);
+        const interpreterElement = document.createElement("script");
+        interpreterElement.src = interpreters[config.interpreter.toLowerCase()].url;
+        interpreterElement.onload = function(e) {
+            logger(`Interpreter "${config.interpreter}" loaded. 👍`);
+            const pyInterpreterLoaded = new CustomEvent("py-interpreter-loaded", {detail: config.interpreter});
+            document.dispatchEvent(pyInterpreterLoaded);
         };
         var head = document.getElementsByTagName('head')[0];
-        logger(`Loading runtime "${config.runtime}". 🚀`)
-        head.appendChild(runtimeElement);
+        logger(`Loading interpreter "${config.interpreter}". 🚀`)
+        head.appendChild(interpreterElement);
     }
 
-    function startRuntime() {
+    function startInterpreter() {
         /*
-        Configure and start the Python runtime.
+        Configure and start the Python interpreter. Now that there is a interpreter,
+        use it to add any filesToLoad to the filesystem.
         */
-        runtime = new runtimes[config.runtime.toLowerCase()]();
-        runtime.start(config);
+        interpreter = new interpreters[config.interpreter.toLowerCase()]();
+        interpreter.start(config);
     }
 
-    function runtimeStarted() {
+    function interpreterStarted() {
         /*
-        The runtime is ready to go, so flip the runtimeReady flag, step
-        through each registered plugin's onRuntimeReady method, and begin
-        evaluating any code in the pendingScripts queue.
+        The interpreter is ready to go, so flip the interpreterReady flag, step
+        through each registered plugin's onInterpreterReady method. Then check if
+        setup is finished.
         */
-        logger(`Runtime started. 🎬`);
-        runtimeReady = true;
-        plugins.forEach(function(plugin) {
-            plugin.onRuntimeReady?.(config, runtime);
+        logger(`Interpreter started. 🎬`);
+        interpreterReady = true;
+        filesToLoad.forEach(function(file) {
+            const pyFileFetched = new CustomEvent("py-file-fetched", {detail: { path: file.path, content: file.content}});
+            document.dispatchEvent(pyFileFetched);
         });
+        plugins.forEach(function(plugin) {
+            plugin.onInterpreterReady?.(config, interpreter);
+        });
+        finished();
     }
 
-    // The following functions coordinate the unfolding of PyScript as various
-    // events are dispatched and state evolves to trigger the next steps.
+    function finished() {
+        /*
+        If both the interpreter and filesystem are in a ready state for evaluating
+        a user's code.
+            - Dispatch the "py-finished-setup" event to signal everything is
+              done.
+        */
+        if (interpreterReady && filesLoaded) {
+            logger(`MicroPyScript finished setup. 🏁`);
+            const pyFinishedSetup = new CustomEvent("py-finished-setup", {detail: { interpreter: interpreter}});
+            document.dispatchEvent(pyFinishedSetup);
+        }
+    }
+
+    // The following functions coordinate the unfolding of MicroPyScript as
+    // various events are dispatched and state evolves to trigger the next
+    // steps.
     //
     // These functions are defined in the order they're roughly expected to
     // be called through the life-cycle of the page, although this cannot be
@@ -579,45 +764,53 @@ const main = function() {
 
     function onPyConfigured(e) {
         /*
-        Once PyScript has loaded its configuration:
+        Once MicroPyScript has loaded its configuration:
             - Register the default plugins (currently only pyScriptTag), so
               they can modify the config if required.
-            - Load the Python runtime into the browser.
+            - Load the Python interpreter into the browser.
             - Display the splash screen.
         */
         registerPlugin(pyScriptTag);
-        loadRuntime();
+        loadFiles();
+        loadInterpreter();
         splashOn();
     }
 
-    function onRuntimeLoaded(e) {
+    function onInterpreterLoaded(e) {
         /*
-        The runtime has loaded over the network.
-            - Start the runtime in this PyScript context.
-            - Start the plugins to kick off Pythonic aspects of the page.
+        The interpreter has loaded over the network.
+            - Start the interpreter in this MicroPyScript context.
+            - Start the plugins to kick off plugin related aspects of the page.
         */
-        startRuntime();
+        startInterpreter();
         startPlugins();
     }
 
-    function onRuntimeReady(e) {
+    function onInterpreterReady(e) {
         /*
-        The runtime is ready to evaluate scripts.
-            - Remove the splash screen.
+        The interpreter is ready to evaluate scripts.
             - Kick off all the pending things needed now it's all started up.
         */
-        splashOff();
-        runtimeStarted();
+        interpreterStarted();
     }
 
-    // Finally, return a function to start PyScript.
+    function onFinished(e) {
+        /*
+        Remove the splash screen.
+        */
+        splashOff();
+    }
+
+    // Finally, return a function to start MicroPyScript.
     return function() {
         // Check to bypass loadConfig, for testing purposes.
         document.addEventListener("py-configured", onPyConfigured);
-        document.addEventListener("py-runtime-loaded", onRuntimeLoaded);
-        document.addEventListener("py-runtime-ready", onRuntimeReady);
-        // An object to represent the PyScript platform in the browser. What is
-        // eventually returned from the main() function.
+        document.addEventListener("py-interpreter-loaded", onInterpreterLoaded);
+        document.addEventListener("py-file-fetched", onFileFetched);
+        document.addEventListener("py-interpreter-ready", onInterpreterReady);
+        document.addEventListener("py-finished-setup", onFinished);
+        // An object to represent the MicroPyScript platform in the browser. What
+        // is eventually returned from the main() function.
         const pyScript = {
             get config() {
                 return config;
@@ -625,21 +818,21 @@ const main = function() {
             get plugins() {
                 return plugins;
             },
-            get availableRuntimes() {
-                return runtimes;
+            get availableInterpreters() {
+                return interpreters;
             },
-            get runtime() {
-                return runtime;
+            get interpreter() {
+                return interpreter;
             },
-            get isRuntimeReady() {
-                return runtimeReady;
+            get isInterpreterReady() {
+                return interpreterReady;
             },
             registerPlugin: function(plugin) {
                 registerPlugin(plugin);
             },
             runPython: function(code) {
-                if (runtimeReady) {
-                    runtime.eval(code);
+                if (interpreterReady) {
+                    interpreter.eval(code);
                 }
             },
             start: function() {
@@ -652,7 +845,7 @@ const main = function() {
 
 
 /******************************************************************************
-Start PyScript.
+Start MicroPyScript.
 ******************************************************************************/
 window.pyScript = main();
 if (!window.pyscriptTest) {

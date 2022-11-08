@@ -25,19 +25,19 @@ const XTERMCSS = ".xterm{cursor:text;position:relative;user-select:none;-ms-user
 const pyReplTag = function(e) {
     /*
     Adds a REPL to the DOM. The REPL session is only initialised when the
-    runtime is ready. The content of the REPL is inserted in the following
+    interpreter is ready. The content of the REPL is inserted in the following
     arrangement of tags:
 
-    <pre class="pyscriptREPL"><code>
+    <pre class="pyREPL"><code>
     </code></pre>
 
     No styling is provided by this plugin (the browser defaults for this
     arrangement of tags will make it look like a TTY session). Bespoke CSS
-    should use the pyscriptREPL class to attach styling.
+    should use the pyREPL class to attach styling.
     */
 
-    // Eventually binds to the runtime, once started.
-    let availableRuntime = null;
+    // Eventually binds to the interpreter, once started.
+    let availableInterpreter= null;
 
     // To hold the textual content of the REPL in the DOM.
     const terminal = document.createElement("div");
@@ -56,7 +56,7 @@ const pyReplTag = function(e) {
 
     function onLoaded(e) {
         term = new Terminal();
-        term.onData(data => availableRuntime.stdin(data));
+        term.onData(data => availableInterpreter.stdin(data));
         term.open(terminal);
     }
 
@@ -67,7 +67,7 @@ const pyReplTag = function(e) {
             config.repl = true
             // Load xterm.js
             const xtermElement = document.createElement("script");
-            xtermElement.src = "lib/xterm.js";
+            xtermElement.src = "static/xterm.js";
             xtermElement.onload = function(e) {
                 const pyXtermLoaded = new CustomEvent("py-xterm-loaded");
                 document.dispatchEvent(pyXtermLoaded);
@@ -78,7 +78,7 @@ const pyReplTag = function(e) {
         },
         start: function(config) {
             // Define the py-repl element.
-            class PyREPL extends HTMLElement {
+            class PolyREPL extends HTMLElement {
                 connectedCallback() {
                     /*
                     Create a shadow DOM with the expected child elements and
@@ -92,12 +92,12 @@ const pyReplTag = function(e) {
                     document.addEventListener("py-print", onPrint);
                 }
             }
-            customElements.define("py-repl", PyREPL);
+            customElements.define("py-repl", PolyREPL);
         },
-        onRuntimeReady: function(config, runtime) {
-            // Store a reference to the runtime, and start the REPL session.
-            availableRuntime = runtime;
-            availableRuntime.startREPL();
+        onInterpreterReady: function(config, interpreter) {
+            // Store a reference to the interpreter, and start the REPL session.
+            availableInterpreter = interpreter;
+            availableInterpreter.startREPL(term);
         }
     };
 

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Configurable interpreters</title>
+    <meta name="theme-color" content="#0b0c0c">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="stylesheet" href="static/gd.css">
+  </head>
+  <body>
+    <py-config>
+    {
+      "interpreter": "micropython",
+      "files": {
+        "arrr.py": "/arrr.py"
+      }
+    }
+    </py-config>
+    <a href="#main-content" class="hide">Skip to main content</a>
+    <a name="top"></a>
+    <header>
+    <nav role="navigation">
+      <a href="/" style="text-decoration: none!important;";>
+        <img alt="Anaconda" src="static/logo.svg" width="54" height="54" style="display:inline;">
+        <img alt="Anaconda" src="static/anaconda.svg" height="54" style="display: inline; height: 42px;">
+      </a>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="https://github.com/pyscript/upys">Download</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main id="main-content">
+    <h2>Configuration</h2>
+
+    <p>Given this HTML/JSON fragment:</p>
+
+    <pre><code>&lt;py-config&gt;
+    {
+      "interpreter": "micropython",
+      "files": {
+        "arrr.py": "/arrr.py"
+      }
+    }
+&lt;/py-config&gt;
+</code></pre>
+
+    <p>We're able to configure various things:</p>
+
+    <ul>
+      <li>The Python interpreter to use underneath the PyScript platform (currently
+      MicroPython and Pyodide are supported).</li>
+      <li>Files to be copied onto the interpreter's virtual filesystem. The
+      <code>files</code> object contains key (filename) and value (the URL
+      containing the content of the file) pairs defining what should be copied
+      over.</li>
+    </ul>
+
+    <p>If you "view source" for this page, you'll see we ensure the
+    <a href="https://arrr.readthedocs.io/en/latest/">Arrr</a> Python module is
+    copied over to the filesystem. Just import it, as usual, to make use of
+    it in your code:</p>
+
+    <pre><code>&lt;py-script&gt;import arrr
+
+text = "Hello there, from MicroPython running in the browser!"
+pirate_text = arrr.translate(text)
+
+print(pirate_text)
+&lt;/py-script&gt;</code></pre>
+
+    <py-script>import arrr
+
+text = "Hello there! It's MicroPython. Running in the browser!"
+pirate_text = arrr.translate(text)
+
+print(pirate_text)
+    </py-script>
+
+    <p>Once again, "view-source" and see for yourself?</p>
+    <a href="/"><button>Previous: Home</button></a>
+    <a href="repl.html"><button>Next: The REPL</button></a>
+  </main>
+  <footer>
+    <main>
+      <section>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="https://github.com/pyscript/upys">Download</a></li>
+        </ul>
+        <article>
+          <p>Made with ❤️  by folks at <a href="https://anaconda.com" rel="noopener">Anaconda Inc</a>.<br>
+            💡Inspired by the great work at <a href="https://micropython.org/" rel="noopener">MicroPython</a>.<br><br>
+        </article>
+      </section>
+    </main>
+  </footer>
+  </body>
+  <script src="pyscript.js" type="module"></script>
+</html>

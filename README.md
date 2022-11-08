@@ -1,6 +1,7 @@
 # MicroPyScript 🔬 🐍
 
-A small, simple kernel of PyScript, made for testing purposes.
+A small, simple kernel of PyScript, made for testing purposes in the spirit of
+a [code spike](https://en.wikipedia.org/wiki/Spike_(software_development)).
 
 This is the way:
 
@@ -10,15 +11,15 @@ This is the way:
 * Vanilla JavaScript.
 * Pluggable.
 * Comments.
-* Tests.
+* (Some) tests.
 * Build for change.
 
-This is a solid foundation for lightweight testing of Python runtimes that
+This is a foundation for lightweight testing of Python interpreters that
 target WASM. Inspired by code in the "real" PyScript website and our plans for
 plugins and simple event based coordination.
 
 Complexity, edge cases and customization is (hopefully) confined to plugins and
-bespoke runtimes.
+bespoke interpreters.
 
 That is all.
 
@@ -56,25 +57,15 @@ To check things are working:
 $ make serve
 ```
 
-Then point your browser to http://0.0.0.0:8000/ to see a "Hello World" from
-MicroPython.
-
-### What's in the files?
-
-* **README.md** - this file, containing project documentation.
-* **Makefile** - common tasks scripted into convenient targets. See above.
-* **hello.py** - a simple "hello world" Python script for PyScript to run.
-* **index.html** - a small web page that uses PyScript.
-* **pyscript.js** - the simple, single file implementation of PyScript.
-* **SpecRunner.html** - a web page to run the test specifications with Jasmine.
-* **spec** - a directory containing the test specifications for Jasmine.
-* **lib** - a directory containing the Jasmine test library.
-
-To change the configuration of PyScript take a look at the JSON object
-defined in the `<py-config>` tag in `index.html`. Currently valid runtimes are
-`micropython` or `pyodide`.
+Then point your browser to http://0.0.0.0:8000/ to see the first page of an
+interactive technical report about using MicroPython. You should be able to
+change the interpreter from `micropython` to `pyodide` and things should just
+work as before, but with a different interpreter at the bottom of the PyScript
+stack.
 
 ## Running the tests
+
+**TESTS ARE CURRENTLY BROKEN**
 
 For the sake of simplicity (and familiarity) we use the
 [Jasmine test framework](https://jasmine.github.io/index.html) to exercise the
@@ -86,43 +77,56 @@ and run the Jasmine based test suite.
 
 ## How it works
 
-The PyScript core only loads configuration, starts the Python runtime and
-allows the registration of plugins. All other logic, capabilities and features
-are contained in the plugins.
+The PyScript core only loads configuration, starts the Python interpreter, 
+allows the registration of plugins and adds files to the interpreter's
+filesystem. All other logic, capabilities and features are contained in the
+plugins.
 
-Currently, only a single plugin is provided by PyScript: the one that
-implements the core `<py-script>` tag.
+Currently, only two plugins are provided:
+
+* One built into PyScript that implements the core `<py-script>` tag.
+* The other (in `customtags.js`) implements the `<py-repl>` tag to demonstrate
+  a "third party" plugin.
 
 The story of PyScript's execution is roughly as follows:
 
 1. Configuration is loaded from the `<py-config>` tag. Once complete the
    `py-configured` event is dispatched, containing the `config` object based
    upon default values overridden by the content of the `<py-config>` tag.
-2. When the `py-configured` event is dispatched two things happen:
-   * The runtime is loaded via injecting a `<script>` tag that references the
-     runtime's URL. Once loaded the `py-runtime-loaded` event is dispatched.
+2. When the `py-configured` event is dispatched three things happen:
+   * The interpreter is loaded via injecting a `<script>` tag that references the
+     interpreter's URL. Once loaded the `py-interpreter-loaded` event is dispatched.
    * Plugins are registered and have their `configure` function called. For each
      plugin registered a `py-plugin-registered` event is dispatched, containing
      the (potentially changed) `config`, and a reference to the newly registered
      plugin.
-3. When `py-runtime-loaded` is dispatched two things happen:
-   * The runtime is instantiated / started. Once complete the `py-runtime-ready`
+   * The content of the files to be added to the interpreter's filesystem are
+     fetched. Once downloaded each file causes a `py-file-fetched` event to be
+     dispatched with the path and content of the file attached to it.
+3. When `py-interpreter-loaded` is dispatched two things happen:
+   * The interpreter is instantiated / started. Once complete the `py-interpreter-ready`
      event is dispatched.
    * All registered plugins have their `start` function called and a
      `py-plugin-started` event is dispatched for each plugin.
-4. When the `py-runtime-ready` event is dispatched all plugins have their
-   `onRuntimeReady` function called with the `config` and `runtime` objects.
-5. Any plugins registered after the runtime is ready immediately have their
-   `configure`, `start` and `onRuntimeReady` functions called, with the
+4. When the `py-interpreter-ready` event is dispatched all plugins have their
+   `onInterpreterReady` function called with the `config` and `interpreter`
+   objects. At this point all files are copied onto the interpreter's
+   filesystem. When all the files are copied the `py-files-loaded` event is
+   dispatched.
+5. When both the interpreter and filesystem are finished setting up and in a
+   ready state, the `py-finished-setup` event is dispatched to signal PyScript
+   is ready to evaluate user's code.
+6. Any plugins registered after the interpreter is ready immediately have their
+   `configure`, `start` and `onInterpreterReady` functions called, with the
    `py-plugin-registered` and `py-plugin-started` events being dispatched.
 
 That's it!
 
 When `pyscript.js` is run, it creates a `window.PyScript` object that contains
 read-only references to the `config`, registered `plugins`,
-`availableRuntimes`, the `runtime` used on the page, an `isRuntimeReady` flag,
-a `registerPlugin` function (see below) and a `runPython(code)` function that
-takes a string of Python.
+`availableInterpreters`, the `interpreter` used on the page, a
+n `isInterpreterReady` flag, a `registerPlugin` function (see below) and a
+`runPython(code)` function that takes a string of Python.
 
 There are copious comments in the `pyscript.js` file. My intention is for
 simplicity, lack of onerous dependencies (bye-bye `npm`), and
@@ -157,8 +161,8 @@ following order (as the lifecycle of the plugin):
   should not be modified by the plugin. Example use cases:
   - Define custom HTML elements.
   - Start fetching external resources.
-* `onRuntimeReady(config, runtime)` - Called once the runtime is ready to
-  evaluate Python code. Example use cases:
+* `onInterpreterReady(config, interpreter)` - Called once the interpreter is
+  ready to evaluate Python code. Example use cases:
   - `pip install` packages.
   - Import/initialize Python plugins.
 
@@ -169,11 +173,11 @@ The following events, dispatched by PyScript itself, are related to plugins:
   immediately after the plugin's `configure` function is called.
 * `py-plugin-started` - Dispatched immediately after a plugin's `start`
   function is called. The event contains a reference to the started plugin.
-* `py-runtime-ready` - causes each plugin's `onRuntimeReady` function to be
-  called.
+* `py-interpreter-ready` - causes each plugin's `onInterpreterReady` function
+  to be called.
 
-If a plugin is registered *after* the runtime is ready, all three functions are
-immediately called in the expected sequence, one after the other.
+If a plugin is registered *after* the interpreter is ready, all three functions
+are immediately called in the expected sequence, one after the other.
 
 The recommended way to create and register plugins is:
 
@@ -202,6 +206,7 @@ const myPlugin = function(e) {
     */
 
     const plugin = {
+        name: "my-plugin",
         configure: function(config) {
             // ...
         },
@@ -209,7 +214,7 @@ const myPlugin = function(e) {
             // ...
             foo();
         },
-        onRuntimeReady: function(config, runtime) {
+        onInterpreterReady: function(config, interpreter) {
             // ...
         }
     };
@@ -226,44 +231,41 @@ Then in your HTML file:
 <script src="pyscript.js" type="module"></script>
 ```
 
-A good example of a plugin is the built-in plugin for the `<py-script>` tag
-found in `pyscript.js` (search for the object assigned to `pyScriptTag`).
+## Interpreters 
 
-## Runtimes
+The `Interpreter` class abstracts away all the implementation details of the
+various Python interpreters we might use.
 
-The `Runtime` class abstracts away all the implementation details of the
-various Python runtimes we might use.
+To see a complete implementation see the `MicroPythonInterpreter` class that
+inherits from `Interpreter`. There is also an incomplete `PyodideInterpreter`
+class so I was able to compare and contrast the differences between
+implementations and arrive at a general abstraction (still very much a work in
+progress). Comments in the code should explain what's going on in terms of the
+life-cycle and capabilities of a "interpreter".
 
-To see a complete implementation see the `MicroPythonRuntime` class that
-inherits from `Runtime`. There is also an incomplete `PyodideRuntime` class so
-I was able to compare and contrast the differences between implementations and
-arrive at a general abstraction (still very much a work in progress). Comments
-in the code should explain what's going on in terms of the life-cycle and
-capabilities of a "runtime".
-
-The afore mentioned `MicroPythonRuntime`, `CPythonRuntime` and `PyodideRuntime`
-all, to a greater or lesser extent, define a uniform shim around their
-respective runtimes. The MicroPython one is most complete, but still needs work
-as I make changes to how MicroPython itself exposes `stdout`, `stderr` and
-consumes `stdin`.
+The afore mentioned `MicroPythonInterpreter`, `CPythonInterpreter` and
+`PyodideInterpreter` all, to a greater or lesser extent, define a uniform shim
+around their respective interpreter. The MicroPython one is most complete, but
+still needs work as I make changes to how MicroPython itself exposes `stdout`,
+`stderr` and consumes `stdin`.
 
 ## The future
 
-Who knows..? But this is a good scaffold for testing different Python runtimes.
+Who knows..? But this is a good scaffold for testing different Python
+interpreters.
 
 Next steps:
 
 * More comprehensive tests.
-* `CPythonRuntime` fully implemented.
-* `PyodideRuntime` finished.
-* `MicroPythonRuntime` refactored after making MicroPython play nicer with
+* `CPythonInterpreter` fully implemented.
+* `PyodideInterpreter` finished.
+* `MicroPythonInterpreter` refactored after making MicroPython play nicer with
   `stdout` and `stderr`.
-* A plugin for a `<py-repl>` tag (the foundations are in place).
-* A uniform way to `pip install` packages in each runtime.
-* A uniform JavaScript gateway from within each runtime.
+* A uniform way to `pip install` packages in each interpreter.
+* A uniform JavaScript gateway from within each interpreter.
 * A uniform `navigator` object through which to access the DOM from within each
-  runtime.
+  interpreter.
 * Running in web-workers (and associated message passing work), for each
-  runtime.
+  interpreter.
 
 That's it..! ;-)

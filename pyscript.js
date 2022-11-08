@@ -44,7 +44,7 @@ const main = function() {
         - "py-plugin-started", when a plugin is started.
         - "py-interpreter-loaded", when the interpreter has been downloaded.
         - "py-interpreter-ready", when the interpreter is ready to process
-          Python for configuration reasons.
+          Python for configuration reasons (such as pip installing modules).
         - "py-file-fetched", when a file, to be added to the interpreter's
           filesystem, has been fetched from the network.
         - "py-files-loaded", when all the files have been copied onto the

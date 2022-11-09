@@ -88,7 +88,7 @@ const main = function() {
 
         static print(output) {
             /*
-            Dispatch the polly-print event (for when output is printed).
+            Dispatch the py-print event (for when output is printed to stdout).
             */
             const pyPrint = new CustomEvent("py-print", {detail: output})
             document.dispatchEvent(pyPrint);

@@ -767,6 +767,8 @@ const main = function() {
         Once MicroPyScript has loaded its configuration:
             - Register the default plugins (currently only pyScriptTag), so
               they can modify the config if required.
+            - Download any files that need to be copied onto the interpreter's
+              filesystem.
             - Load the Python interpreter into the browser.
             - Display the splash screen.
         */
@@ -803,7 +805,6 @@ const main = function() {
 
     // Finally, return a function to start MicroPyScript.
     return function() {
-        // Check to bypass loadConfig, for testing purposes.
         document.addEventListener("py-configured", onPyConfigured);
         document.addEventListener("py-interpreter-loaded", onInterpreterLoaded);
         document.addEventListener("py-file-fetched", onFileFetched);

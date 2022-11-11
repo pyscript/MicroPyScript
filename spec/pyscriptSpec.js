@@ -38,7 +38,7 @@ describe("In the PyScript project,", function() {
             result = e.detail;
         };
         document.addEventListener("py-configured", checkEvent);
-        pyscript.loadConfig();
+        pyscript.start();
         expect(result.runtime).toEqual("micropython");
         expect(result.mp_memory).toEqual(65536);
     });
@@ -49,7 +49,7 @@ describe("In the PyScript project,", function() {
             result = e.detail;
         };
         document.addEventListener("py-configured", checkEvent);
-        pyscript.loadConfig();
+        pyscript.start();
         expect(result).toBeDefined()
     });
 
@@ -64,15 +64,15 @@ describe("In the PyScript project,", function() {
     it("registerPlugin should configure the passed-in plugins, startPlugins should start them", function() {
         let configureFlag = false;
         let startFlag = false;
-        class TestPlugin extends Plugin {
-            configure(config) {
+        const TestPlugin = {
+            configure: function(config) {
                 configureFlag = true;
-            }
-            start(config) {
+            },
+            start: function(config) {
                 startFlag = true;
             }
         }
-        pyscript.registerPlugin(new TestPlugin());
+        pyscript.registerPlugin(TestPlugin);
         expect(configureFlag).toEqual(true);
         pyscript.startPlugins();
         expect(startFlag).toEqual(true);

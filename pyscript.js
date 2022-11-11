@@ -508,6 +508,26 @@ const main = function() {
         }
     }
 
+    /**************************************************************************
+    Utility functions for MicroPyScript.
+    **************************************************************************/
+
+    function toJSON(node) {
+        /*
+        Takes a node in the DOM and serialises it into JSON.
+        */
+    }
+
+    function toDOM(obj) {
+        /*
+        Takes a JSON object and returns a node to mutate into the DOM.
+        */
+    } 
+
+    /**************************************************************************
+    Variables and functions needed for the life-cycle of MicroPyScript.
+    **************************************************************************/
+
     // Default configuration settings for MicroPyScript. These may be overridden
     // by the app.loadConfig function.
     // The "files" object should look like this:
@@ -674,8 +694,10 @@ const main = function() {
         // setup.
         Promise.all(pendingDownloads).then((values) => {
             filesLoaded = true;
-            if (values) {
-                logger(`All files downloaded, copying to filesystem. 📥`);
+            if (values.length > 0) {
+                logger(`${values.length} file[s] downloaded, copying to filesystem. 📥`);
+            } else {
+                logger(`No files to download, nothing to do on filesystem. 📥`);
             }
             const pyFilesLoaded = new CustomEvent("py-files-loaded");
             document.dispatchEvent(pyFilesLoaded);
@@ -687,8 +709,8 @@ const main = function() {
         /*
         Save the file's content to the path on the interpreter's local filesystem.
         */
-        logger(`Saving file "${e.detail.path}" to file system. 💾`);
         interpreter.addFile(e.detail.path, e.detail.content);
+        logger(`Saved file "${e.detail.path}" to file system. 💾`);
     }
 
     function loadInterpreter() {
@@ -805,13 +827,8 @@ const main = function() {
 
     // Finally, return a function to start MicroPyScript.
     return function() {
-        document.addEventListener("py-configured", onPyConfigured);
-        document.addEventListener("py-interpreter-loaded", onInterpreterLoaded);
-        document.addEventListener("py-file-fetched", onFileFetched);
-        document.addEventListener("py-interpreter-ready", onInterpreterReady);
-        document.addEventListener("py-finished-setup", onFinished);
-        // An object to represent the MicroPyScript platform in the browser. What
-        // is eventually returned from the main() function.
+        // An object to represent the MicroPyScript platform in the browser.
+        // What is eventually returned from the main() function.
         const pyScript = {
             get config() {
                 return config;
@@ -837,6 +854,11 @@ const main = function() {
                 }
             },
             start: function() {
+                document.addEventListener("py-configured", onPyConfigured);
+                document.addEventListener("py-interpreter-loaded", onInterpreterLoaded);
+                document.addEventListener("py-file-fetched", onFileFetched);
+                document.addEventListener("py-interpreter-ready", onInterpreterReady);
+                document.addEventListener("py-finished-setup", onFinished);
                 loadConfig();
             }
         };

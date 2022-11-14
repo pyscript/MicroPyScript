@@ -2,7 +2,7 @@
 /******************************************************************************
 MicroPyScript. 🐍
 
-A small, simple, single file kernel of getting scripting languages into the
+A small, simple, single file kernel for getting scripting languages into the
 browser, made for testing purposes and technical exploration.
 
 See the README for more details, design decisions, and an explanation of how
@@ -65,9 +65,9 @@ const main = function() {
 
     class Interpreter {
         /*
-        Defines and encapsulates a interpreter used by MicroPyScript to evaluate
-        code or run an interactive REPL with a scripting language compiled to
-        WASM.
+        Defines and encapsulates a interpreter used by MicroPyScript to
+        evaluate code or run an interactive REPL with a scripting language
+        compiled to WASM.
         */
 
         static get url() {
@@ -79,8 +79,8 @@ const main = function() {
 
         static ready() {
             /*
-            Dispatch the py-interpreter-ready event (for when the interpreter has
-            eventually started and is ready to evaluate code).
+            Dispatch the py-interpreter-ready event (for when the interpreter
+            has eventually started and is ready to evaluate code).
             */
             const pyInterpreterReady = new CustomEvent("py-interpreter-ready", this);
             document.dispatchEvent(pyInterpreterReady);
@@ -97,8 +97,8 @@ const main = function() {
         start(config) {
             /*
             Instantiate, setup, configure and do whatever else is needed to
-            start the interpreter. This is called once the interpreter is loaded into
-            the browser.
+            start the interpreter. This is called once the interpreter is
+            loaded into the browser.
             */
         }
 
@@ -128,8 +128,8 @@ const main = function() {
         }
     }
 
-    // The innerHTML of the default splash screen to show while MicroPyScript is
-    // starting up. Currently the page is greyed out and the words
+    // The innerHTML of the default splash screen to show while MicroPyScript
+    // is starting up. Currently the page is greyed out and the words
     // "Loading MicroPyScript...".
     const defaultSplash= '<div style="position:fixed;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:9999;"><div style="position:absolute;top:50%;left:40%;color:white;">Loading MicroPyScript... 🐍</div></div>';
 
@@ -196,16 +196,16 @@ const main = function() {
             The given script is ready to be evaluated.
 
             Either queue it for later evaluation if the interpreter isn't ready
-            yet, or dispatch the py-eval-script event to signal to the interpreter
-            it should evaluate the script.
+            yet, or dispatch the py-eval-script event to signal to the
+            interpreter it should evaluate the script.
             */
             if (availableInterpreter) {
                 // Interpreter is ready, so evaluate the code.
                 const pyEvalScript = new CustomEvent("py-eval-script", {detail: e.detail});
                 document.dispatchEvent(pyEvalScript);
             } else {
-                // No interpreter, so add to pendingScripts queue, to be evaluated
-                // once the interpreter is ready.
+                // No interpreter, so add to pendingScripts queue, to be
+                // evaluated once the interpreter is ready.
                 pendingScripts.push(e.detail);
             }
         }
@@ -238,7 +238,8 @@ const main = function() {
         document.addEventListener("py-eval-script", evaluateScript);
 
         // The object to contain the various functions needed to handle the
-        // life cycle of this plugin, returned to the MicroPyScript environment.
+        // life cycle of this plugin, returned to the MicroPyScript
+        // environment.
         const plugin = {
             name: "py-script",
             start: function(config) {
@@ -512,30 +513,137 @@ const main = function() {
     Utility functions for MicroPyScript.
     **************************************************************************/
 
+    function toJS(node) {
+        /*
+        Takes a node in the DOM and recursively converts it and its children
+        into a JSON encodable JavaScript object.
+
+        What information is captured?
+
+        * The nodeType (see: https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType).
+        * The tag or node name (e.g. "div", "p" or "input").
+        * The nodeValue (e.g. the textual content of a text node).
+        * An object containing the key/value pairs representing the attributes
+          of a node.
+        * If a textarea, its "value" (i.e. textual content).
+        * An array of childNodes, also captured in the same way.
+
+        The nodeType is essential for representing the node with the correct
+        "type" when de-serialized.
+        */
+        const obj = {
+            nodeType: node.nodeType;
+        };
+        if (node.tagName) {
+            obj.tagName = node.tagName.toLowerCase();
+        } else if (node.nodeName) {
+            obj.nodeName = node.nodeName;
+        }
+        if (node.nodeValue) {
+            obj.nodeValue = node.nodeValue;
+        }
+        const attrs = {};
+        if (node.attributes.length > 0) {
+            for (let i=0; i<node.attributes.length; i++) {
+                attrs[node.attributes[i].nodeName] = node.attributes[i].nodeValue;
+            }
+        }
+        obj.attributes = attrs;
+        if (obj.tagName === "textarea") {
+            obj.value = node.value;
+        }
+        const childNodes = node.childNodes;
+        const childNodesJS = [];
+        // textarea nodes are special, in that they shouldn't have childNodes
+        // since their content is supposed to be defined via their "value".
+        if (obj.tagName !== 'textarea' && childNodes && childNodes.length > 0) {
+            for (let i=0; i<childNodes.length; i++) {
+                childNodesJS[i] = toJS(childNodes[i]);
+            }
+        }
+        obj.childNodes = childNodesJS;
+        return obj;
+    }
+
     function toJSON(node) {
         /*
         Takes a node in the DOM and serialises it into JSON.
         */
+        return JSON.stringify(toJS(node));
     }
 
-    function toDOM(obj) {
+    function toNode(obj) {
         /*
-        Takes a JSON object and returns a node to mutate into the DOM.
+        Takes a JavaScript object and returns the equivalent HTML node.
         */
-    } 
+        let node = null;  // The eventual result. 
+        // See: https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
+        switch (obj.nodeType) {
+            // ELEMENT_NODE
+            case 1: {
+                node = document.createElement(obj.tagName);
+                if (obj.attributes && obj.attributes.length > 0) {
+                    for (const [name, value] of obj.attributes) {
+                        node.setAttribute(name, value);
+                    }
+                }
+                if (obj.tagName === "textarea") {
+                    node.value = obj.value;
+                }
+                break;
+            }
+            // TEXT_NODE
+            case 3: {
+                return document.createTextNode(obj.nodeValue);
+            }
+            // COMMENT_NODE
+            case 8: {
+                return document.createComment(obj.nodeValue);
+            }
+            // DOCUMENT_FRAGMENT_NODE
+            case 11: {
+                node = document.createDocumentFragment();
+                break;
+            }
+            default: {
+                // Default to an empty fragment node.
+                return document.createDocumentFragment();
+            }
+        }
+        // Recursively recreate the child nodes.
+        // (textarea nodes are special, in that they shouldn't have childNodes
+        // since their content is supposed to be defined via their "value".)
+        if (obj.tagName !== 'textarea' && obj.childNodes && obj.childNodes.length > 0) {
+            for (const childNode of obj.childNodes) {
+                node.appendChild(toNode(childNode));
+            }
+        }
+        return node;
+    }
+
+    function toDom(jsonString) {
+        /*
+        Takes a JSON string and returns an equivalent HTML node to merge into
+        the DOM.
+        */
+        return toNode(JSON.parse(jsonString));
+    }
 
     /**************************************************************************
     Variables and functions needed for the life-cycle of MicroPyScript.
     **************************************************************************/
 
-    // Default configuration settings for MicroPyScript. These may be overridden
-    // by the app.loadConfig function.
+    // Default configuration settings for MicroPyScript. These may be
+    // overridden by the app.loadConfig function.
+    //
     // The "files" object should look like this:
+    //
     // "files": {
     //   "myfile.py": "https://domain.com/myfile.py",
     //   "myotherfile.txt": "otherfile.txt"
     // }
-    // Key: filename on WASM filesystem.
+    //
+    // Key: path/filename on the interpreter's filesystem.
     // Value: url to download content of file.
     const config = {
         "interpreter": "micropython",  // Numpty default.
@@ -547,6 +655,7 @@ const main = function() {
     const plugins = [];
 
     // Details of interpreters.
+    //
     // Key: lowercase interpreter name.
     // Value: the class wrapping that version of the interpreter.
     const interpreters = {
@@ -559,8 +668,8 @@ const main = function() {
     // perhaps not yet ready).
     const filesToLoad = [];
 
-    // Eventually references an instance of the Interpreter class, representing the
-    // started interpreter.
+    // Eventually references an instance of the Interpreter class,
+    // representing the started interpreter.
     let interpreter = null;
 
     // Flag to indicate that all the files to be copied into the filesystem
@@ -576,8 +685,8 @@ const main = function() {
 
     function loadConfig() {
         /*
-        Loads configuration for running MicroPyScript from JSON contained in the
-        py-config element. Updates the default config object. Dispatches a
+        Loads configuration for running MicroPyScript from JSON contained in
+        the py-config element. Updates the default config object. Dispatches a
         py-configured event when done.
         */
         let userConf = {};
@@ -665,8 +774,8 @@ const main = function() {
                     if (response.ok) {
                         response.text().then(content => {
                             if (interpreterReady) {
-                                // The interpreter exists, so just add the file to
-                                // its filesystem.
+                                // The interpreter exists, so just add the
+                                // file to its filesystem.
                                 const pyFileFetched = new CustomEvent("py-file-fetched", {detail: { path: path, content: content}});
                                 document.dispatchEvent(pyFileFetched);
                             } else {
@@ -707,7 +816,8 @@ const main = function() {
 
     function onFileFetched(e) {
         /*
-        Save the file's content to the path on the interpreter's local filesystem.
+        Save the file's content to the path on the interpreter's local
+        filesystem.
         */
         interpreter.addFile(e.detail.path, e.detail.content);
         logger(`Saved file "${e.detail.path}" to file system. 💾`);
@@ -737,8 +847,8 @@ const main = function() {
 
     function startInterpreter() {
         /*
-        Configure and start the Python interpreter. Now that there is a interpreter,
-        use it to add any filesToLoad to the filesystem.
+        Configure and start the Python interpreter. Now that there is a
+        interpreter, use it to add any filesToLoad to the filesystem.
         */
         interpreter = new interpreters[config.interpreter.toLowerCase()]();
         interpreter.start(config);
@@ -747,8 +857,8 @@ const main = function() {
     function interpreterStarted() {
         /*
         The interpreter is ready to go, so flip the interpreterReady flag, step
-        through each registered plugin's onInterpreterReady method. Then check if
-        setup is finished.
+        through each registered plugin's onInterpreterReady method. Then check
+        if setup is finished.
         */
         logger(`Interpreter started. 🎬`);
         interpreterReady = true;
@@ -764,10 +874,9 @@ const main = function() {
 
     function finished() {
         /*
-        If both the interpreter and filesystem are in a ready state for evaluating
-        a user's code.
-            - Dispatch the "py-finished-setup" event to signal everything is
-              done.
+        If both the interpreter and filesystem are in a ready state for
+        evaluating a user's code then dispatch the "py-finished-setup" event
+        to signal everything is done.
         */
         if (interpreterReady && filesLoaded) {
             logger(`MicroPyScript finished setup. 🏁`);

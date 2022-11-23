@@ -300,7 +300,7 @@ const main = function() {
                 mp_memory = config.mp_memory;
             }
             document.addEventListener('micropython-print', function(e) {
-                Interpreter.print(e.data);
+                Interpreter.print(e.detail);
             }, false);
             let mp_js_startup = Module['onRuntimeInitialized'];
             Module["onRuntimeInitialized"] = async function() {

@@ -294,21 +294,21 @@ const main = function() {
             return "mpbuild/micropython.js";
         }
 
+        //for a real use of workers we'd probabbly use beforePyScriptExec
+        //and afterPyScriptExec functions to parse pyscript's tag
+        //not entirely sure if we should just copy this functionality to mps?
         start(config, worker='worker1') {
             if (worker.length > 0)
             {
                 let mp_memory = 1024 * 1024;  // 1Mb
                 worker = worker + '.mjs';
-                //needs to be a type = module rather than classic
                 const worker_thread = new Worker(worker, {
                     type: 'module'
                 });
-                console.log('🔥 worker ', worker_thread)
 
                 var worker_code = "";
                 worker_thread.addEventListener('message', function(e) {
                     worker_code = e.data;
-                    console.log(`🔥 Received message from worker: ${e.data}`);
                 }, false);
 
                 let mp_js_startup = Module['onRuntimeInitialized'];
@@ -316,7 +316,6 @@ const main = function() {
                     mp_js_startup();
                     mp_js_init(mp_memory);
                     Interpreter.ready();
-                    console.log('🔥 running worker_code ', worker_code)
                     mp_js_do_str(worker_code);
                 }
 
@@ -879,7 +878,6 @@ const main = function() {
             },
             runPython: function(code) {
                 if (interpreterReady) {
-                    console.log('🦄 code is being evalued by pyscript and its actly ready')
                     interpreter.eval(code);
                 }
             },

@@ -294,7 +294,35 @@ const main = function() {
             return "mpbuild/micropython.js";
         }
 
-        start(config) {
+        start(config, worker='worker1') {
+            if (worker.length > 0)
+            {
+                let mp_memory = 1024 * 1024;  // 1Mb
+                worker = worker + '.mjs';
+                //needs to be a type = module rather than classic
+                const worker_thread = new Worker(worker, {
+                    type: 'module'
+                });
+                console.log('🔥 worker ', worker_thread)
+
+                var worker_code = "";
+                worker_thread.addEventListener('message', function(e) {
+                    worker_code = e.data;
+                    console.log(`🔥 Received message from worker: ${e.data}`);
+                }, false);
+
+                let mp_js_startup = Module['onRuntimeInitialized'];
+                Module["onRuntimeInitialized"] = async function() {
+                    mp_js_startup();
+                    mp_js_init(mp_memory);
+                    Interpreter.ready();
+                    console.log('🔥 running worker_code ', worker_code)
+                    mp_js_do_str(worker_code);
+                }
+
+            }
+            //run current code if worker attr. is not used
+            else {
             let mp_memory = 1024 * 1024;  // 1Mb
             if(config.mp_memory) {
                 mp_memory = config.mp_memory;
@@ -307,6 +335,7 @@ const main = function() {
                 mp_js_startup();
                 mp_js_init(mp_memory);
                 Interpreter.ready();
+                }
             }
         }
 
@@ -850,6 +879,7 @@ const main = function() {
             },
             runPython: function(code) {
                 if (interpreterReady) {
+                    console.log('🦄 code is being evalued by pyscript and its actly ready')
                     interpreter.eval(code);
                 }
             },

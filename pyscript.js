@@ -320,21 +320,21 @@ const main = function() {
                 }
 
             }
-            //run current code if worker attr. is not used
+            //run normally if worker attr. is not present
             else {
-            let mp_memory = 1024 * 1024;  // 1Mb
-            if(config.mp_memory) {
-                mp_memory = config.mp_memory;
-            }
-            document.addEventListener('micropython-print', function(e) {
-                Interpreter.print(e.data);
-            }, false);
-            let mp_js_startup = Module['onRuntimeInitialized'];
-            Module["onRuntimeInitialized"] = async function() {
-                mp_js_startup();
-                mp_js_init(mp_memory);
-                Interpreter.ready();
+                let mp_memory = 1024 * 1024;  // 1Mb
+                if(config.mp_memory) {
+                    mp_memory = config.mp_memory;
                 }
+                document.addEventListener('micropython-print', function(e) {
+                    Interpreter.print(e.data);
+                }, false);
+                let mp_js_startup = Module['onRuntimeInitialized'];
+                Module["onRuntimeInitialized"] = async function() {
+                    mp_js_startup();
+                    mp_js_init(mp_memory);
+                    Interpreter.ready();
+                    }
             }
         }
 

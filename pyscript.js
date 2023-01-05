@@ -256,7 +256,7 @@ const main = function() {
                         const code = this.textContent;
                         this.textContent = "";
                         const script = {
-                            code: code.trim() ? code : "",
+                            code: code,
                             src: this.attributes.src ? this.attributes.src.value : "",
                             target: this
                         };
@@ -293,8 +293,42 @@ const main = function() {
         static get url() {
             return "mpbuild/micropython.js";
         }
+        start(config){
+            if (1)
+            {
+                let mp_memory = 1024 * 1024;  // 1Mb
+                let worker = 'worker1.mjs';
+                //needs to be a type = module rather than classic
+                const worker_thread = new Worker('worker1.mjs');
 
-        start(config) {
+                console.log('🔥 worker ', worker_thread)
+
+                var worker_code = {
+                    code: ""
+                };
+                worker_thread.onmessage = (ev) => {
+                    let data = ev.data;
+                    console.log(typeof data, data);
+                    worker_code.code = data;
+
+                    let mp_js_startup = Module['onRuntimeInitialized'];
+                    Module["onRuntimeInitialized"] = async function() {
+                        mp_js_startup();
+                        mp_js_init(mp_memory);
+
+                    }
+                }
+
+                run = async function() {
+                    await Interpreter.ready();
+                    await eval(worker_code);
+                }
+
+                run()
+            }
+
+            //run current code if worker attr. is not used
+            else {
             let mp_memory = 1024 * 1024;  // 1Mb
             if(config.mp_memory) {
                 mp_memory = config.mp_memory;
@@ -307,8 +341,9 @@ const main = function() {
                 mp_js_startup();
                 mp_js_init(mp_memory);
                 Interpreter.ready();
-            }
+                }
         }
+    }
 
         eval(script) {
             mp_js_do_str(script.code);
@@ -608,7 +643,10 @@ const main = function() {
         /*
         Remove the splash screen, once MicroPyScript is finished starting.
         */
-        splashElement.parentNode.removeChild(splashElement);
+        if (splashElement.parentNode)
+        {
+            splashElement.parentNode.removeChild(splashElement);
+        }
     }
 
     function registerPlugin(plugin) {
